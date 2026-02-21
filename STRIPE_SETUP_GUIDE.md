@@ -27,6 +27,16 @@ Esta guía te ayudará a configurar completamente Stripe para procesar pagos en 
 
 ## 🛠️ Paso 2: Configurar Claves API
 
+### 2.1 Obtener las claves
+1. En el Dashboard de Stripe, ve a **Developers** → **API keys**
+2. Verás dos tipos de claves:
+   - **Publishable key** (pk_test_...): Para el frontend
+   - **Secret key** (sk_test_...): Para el backend (¡NUNCA la compartas!)
+
+### 2.2 Configurar variables de entorno
+
+
+
 
 
 ## 🌐 Paso 3: Configurar Webhooks
