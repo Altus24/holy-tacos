@@ -1,0 +1,450 @@
+{
+  "info": {
+    "name": "Holy Tacos API - Colección Completa",
+    "description": "Colección de Postman con todos los endpoints de Holy Tacos",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseURL",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "adminToken",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "🔐 Autenticación",
+      "item": [
+        {
+          "name": "Registrar Usuario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"cliente@ejemplo.com\",\n  \"password\": \"123456\",\n  \"role\": \"client\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/auth/register",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login Usuario",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.token) {",
+                  "        pm.collectionVariables.set('authToken', response.token);",
+                  "        console.log('Token guardado automáticamente:', response.token.substring(0, 20) + '...');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"cliente@ejemplo.com\",\n  \"password\": \"123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/auth/login",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const response = pm.response.json();",
+                  "    if (response.success && response.token) {",
+                  "        pm.collectionVariables.set('adminToken', response.token);",
+                  "        console.log('Admin token guardado automáticamente');",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@holy-tacos.com\",\n  \"password\": \"admin123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/auth/login",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Verificar Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{authToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/auth/verify",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "auth", "verify"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏪 Restaurantes",
+      "item": [
+        {
+          "name": "Obtener Todos los Restaurantes",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/restaurants",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "restaurants"]
+            }
+          }
+        },
+        {
+          "name": "Obtener Restaurante por ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/restaurants/698772f78a40130a363da159",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "restaurants", "698772f78a40130a363da159"]
+            }
+          }
+        },
+        {
+          "name": "Crear Restaurante (Admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Nuevo Restaurante desde Postman\",\n  \"address\": \"Dirección de Postman 123\",\n  \"phone\": \"+52 55 1234 5678\",\n  \"menu\": [\n    {\n      \"name\": \"Hamburguesa Clásica\",\n      \"price\": 85,\n      \"description\": \"Hamburguesa con queso y papas\",\n      \"category\": \"plato principal\"\n    },\n    {\n      \"name\": \"Refresco\",\n      \"price\": 25,\n      \"category\": \"bebida\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/restaurants",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "restaurants"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "📦 Pedidos",
+      "item": [
+        {
+          "name": "Obtener Mis Pedidos",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseURL}}/api/orders",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Crear Nuevo Pedido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"restaurantId\": \"698772f78a40130a363da159\",\n  \"items\": [\n    {\n      \"name\": \"Taco de Carnitas\",\n      \"price\": 45,\n      \"quantity\": 2\n    },\n    {\n      \"name\": \"Agua de Horchata\",\n      \"price\": 20,\n      \"quantity\": 1\n    }\n  ],\n  \"deliveryAddress\": \"Mi casa desde Postman 123, Ciudad\",\n  \"notes\": \"Pedido creado desde Postman - Sin cebolla\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/orders",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "orders"]
+            }
+          }
+        },
+        {
+          "name": "Actualizar Estado de Pedido (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"accepted\",\n  \"driverId\": \"ID_DEL_CONDUCTOR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/orders/ID_DEL_PEDIDO/status",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "orders", "ID_DEL_PEDIDO", "status"]
+            }
+          }
+        },
+        {
+          "name": "Actualizar Estado de Pedido (Driver)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"preparing\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/orders/ID_DEL_PEDIDO/status",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "orders", "ID_DEL_PEDIDO", "status"]
+            }
+          }
+        },
+        {
+          "name": "Asignar Conductor a Pedido (Admin)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"driverId\": \"ID_DEL_CONDUCTOR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/orders/ID_DEL_PEDIDO/assign-driver",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "orders", "ID_DEL_PEDIDO", "assign-driver"]
+            }
+          }
+        },
+        {
+          "name": "Obtener Conductores Disponibles",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseURL}}/api/orders/available-drivers",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "orders", "available-drivers"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "💳 Pagos (Stripe Simulado)",
+      "item": [
+        {
+          "name": "Crear Sesión de Pago",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 160,\n  \"currency\": \"mxn\",\n  \"description\": \"Pedido Holy Tacos desde Postman\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/payment/create-session",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "payment", "create-session"]
+            }
+          }
+        },
+        {
+          "name": "Confirmar Pago",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"sessionId\": \"cs_sim_1770490052459_15rkj8yxp\",\n  \"paymentMethodId\": \"pm_simulated_card\"\n}"
+            },
+            "url": {
+              "raw": "{{baseURL}}/api/payment/confirm",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "payment", "confirm"]
+            }
+          }
+        },
+        {
+          "name": "Tarjetas de Prueba",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseURL}}/api/payment/test-card",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "payment", "test-card"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "👥 Usuarios (Admin)",
+      "item": [
+        {
+          "name": "Obtener Todos los Usuarios",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{adminToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseURL}}/api/users",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "users"]
+            }
+          }
+        },
+        {
+          "name": "Obtener Perfil",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseURL}}/api/users/profile",
+              "host": ["{{baseURL}}"],
+              "path": ["api", "users", "profile"]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
