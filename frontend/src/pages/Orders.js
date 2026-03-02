@@ -23,6 +23,7 @@ const Orders = () => {
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelMessage, setCancelMessage] = useState(null); // { type: 'success' | 'error', text: '' }
   const [expandedCompletedOrderId, setExpandedCompletedOrderId] = useState(null); // dropdown pedidos completados
+  const [openActionsDropdownId, setOpenActionsDropdownId] = useState(null); // dropdown acciones (pago/soporte/cancelar)
 
   // Función para obtener pedidos del usuario
   const fetchOrders = async () => {
@@ -539,28 +540,56 @@ const Orders = () => {
                         Pedido realizado: {new Date(order.createdAt).toLocaleString()}
                       </div>
 
-                      <div className="flex space-x-2">
-                        {/* Completar pago: pedidos con pago pendiente */}
-                        {order.paymentStatus === 'pending' && (
-                          <Link
-                            to={`/checkout?orderId=${order._id}`}
-                            className="flex items-center bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 transition-colors text-sm font-medium"
-                          >
-                            💳 Completar pago
-                          </Link>
-                        )}
-
-                        {/* Botón para cancelar pedido (visible si el pedido es cancelable) */}
-                        {isCancellable(order) && (
-                          <button
-                            onClick={() => handleOpenCancelModal(order)}
-                            className="flex items-center bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-colors text-sm font-medium"
-                          >
-                            <svg className="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                            Cancelar Pedido
-                          </button>
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* Dropdown: Proceder al pago / Contactar soporte / Cancelar pedido (pedidos pendientes de pago o cancelados) */}
+                        {(order.paymentStatus === 'pending' || isCancellable(order) ||
+                          order.status === 'cancelled' || order.status === 'cancelled_by_client' ||
+                          order.status === 'cancelled_by_client_with_penalty' ||
+                          order.status === 'cancelled_by_admin' || order.status === 'cancelled_by_admin_with_penalty') && (
+                          <div className="relative">
+                            <button
+                              type="button"
+                              onClick={() => setOpenActionsDropdownId(openActionsDropdownId === order._id ? null : order._id)}
+                              className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-200 border border-gray-300 text-sm font-medium"
+                            >
+                              Acciones del pedido
+                              <svg className={`w-4 h-4 transition-transform ${openActionsDropdownId === order._id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                              </svg>
+                            </button>
+                            {openActionsDropdownId === order._id && (
+                              <>
+                                <div className="fixed inset-0 z-10" onClick={() => setOpenActionsDropdownId(null)} aria-hidden="true" />
+                                <div className="absolute right-0 mt-1 w-56 rounded-lg shadow-lg bg-white border border-gray-200 py-1 z-20">
+                                  {order.paymentStatus === 'pending' && (
+                                    <Link
+                                      to={`/checkout?orderId=${order._id}`}
+                                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700"
+                                      onClick={() => setOpenActionsDropdownId(null)}
+                                    >
+                                      💳 Proceder al pago
+                                    </Link>
+                                  )}
+                                  <a
+                                    href="mailto:soporte@holytacos.com"
+                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                                    onClick={() => setOpenActionsDropdownId(null)}
+                                  >
+                                    📞 Contactar soporte
+                                  </a>
+                                  {isCancellable(order) && (
+                                    <button
+                                      type="button"
+                                      onClick={() => { setOpenActionsDropdownId(null); handleOpenCancelModal(order); }}
+                                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium"
+                                    >
+                                      Cancelar pedido
+                                    </button>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
                         )}
 
                         {/* Botón para ver tracking en tiempo real */}
@@ -592,15 +621,6 @@ const Orders = () => {
                           >
                             ⭐ Calificar ahora
                           </Link>
-                        )}
-
-                        {/* Botón para contactar soporte si hay problemas */}
-                        {(order.status === 'cancelled' || order.status === 'cancelled_by_client' ||
-                          order.status === 'cancelled_by_client_with_penalty' ||
-                          order.status === 'cancelled_by_admin' || order.status === 'cancelled_by_admin_with_penalty') && (
-                          <button className="text-red-600 hover:text-red-800 text-sm font-medium">
-                            Contactar Soporte
-                          </button>
                         )}
 
                         {/* Botón para reordenar si está completado */}

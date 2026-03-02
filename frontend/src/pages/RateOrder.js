@@ -1,5 +1,5 @@
 // Página de calificación del conductor y restaurante después de confirmar recepción
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
@@ -40,11 +40,7 @@ const RateOrder = () => {
   const [restaurantStars, setRestaurantStars] = useState(0);
   const [restaurantComment, setRestaurantComment] = useState('');
 
-  useEffect(() => {
-    if (orderId && isAuthenticated()) loadOrder();
-  }, [orderId, isAuthenticated]);
-
-  const loadOrder = async () => {
+  const loadOrder = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -74,7 +70,11 @@ const RateOrder = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [orderId, user?._id]);
+
+  useEffect(() => {
+    if (orderId && isAuthenticated()) loadOrder();
+  }, [orderId, isAuthenticated, loadOrder]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

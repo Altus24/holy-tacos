@@ -1,7 +1,6 @@
-// Context API para manejar el carrito de compras en Holy Tacos
+// Context API para el carrito en Holy Tacos. Tras registro de cliente se llama clearCart() para dejarlo vacío.
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
-// Context para el carrito
 const CartContext = createContext();
 
 // Hook personalizado para usar el contexto del carrito
@@ -13,33 +12,37 @@ export const useCart = () => {
   return context;
 };
 
+const CART_STORAGE_KEY = 'holy-tacos-cart';
+
+function loadCartFromStorage() {
+  try {
+    const saved = localStorage.getItem(CART_STORAGE_KEY);
+    if (!saved) return [];
+    const parsed = JSON.parse(saved);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('Error al cargar carrito desde localStorage:', error);
+    localStorage.removeItem(CART_STORAGE_KEY);
+    return [];
+  }
+}
+
 // Provider del contexto del carrito
 export const CartProvider = ({ children }) => {
-  // Estado del carrito - array de items
-  const [cartItems, setCartItems] = useState([]);
+  // Estado del carrito: inicializar desde localStorage para que al recargar no se pierda
+  const [cartItems, setCartItems] = useState(loadCartFromStorage);
 
   // Estado de loading para operaciones del carrito
   const [loading, setLoading] = useState(false);
 
   // Estado para el mini-cart (panel lateral/dropdown rápido)
   const [isMiniCartOpen, setIsMiniCartOpen] = useState(false);
+  // Estado expandido/colapsado del contenido del mini-cart (header siempre visible cuando abierto)
+  const [isMiniCartExpanded, setIsMiniCartExpanded] = useState(true);
 
-  // Cargar carrito desde localStorage al iniciar
+  // Guardar carrito en localStorage cuando cambie (no en el primer render, así no se sobrescribe con [])
   useEffect(() => {
-    const savedCart = localStorage.getItem('holy-tacos-cart');
-    if (savedCart) {
-      try {
-        setCartItems(JSON.parse(savedCart));
-      } catch (error) {
-        console.error('Error al cargar carrito desde localStorage:', error);
-        localStorage.removeItem('holy-tacos-cart');
-      }
-    }
-  }, []);
-
-  // Guardar carrito en localStorage cuando cambie
-  useEffect(() => {
-    localStorage.setItem('holy-tacos-cart', JSON.stringify(cartItems));
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
   }, [cartItems]);
 
   // Función para agregar item al carrito
@@ -75,8 +78,7 @@ export const CartProvider = ({ children }) => {
       }
     });
 
-    // Abrir mini-cart automáticamente al agregar (mejor UX)
-    setIsMiniCartOpen(true);
+    // No abrir el menú lateral al agregar; el toast en RestaurantDetail informa al usuario.
   };
 
   // Función para actualizar cantidad de un item
@@ -108,7 +110,7 @@ export const CartProvider = ({ children }) => {
     );
   };
 
-  // Función para limpiar todo el carrito
+  // Vaciar carrito (usado tras registro de cliente para iniciar con carrito vacío)
   const clearCart = () => {
     setCartItems([]);
   };
@@ -158,6 +160,7 @@ export const CartProvider = ({ children }) => {
   // Control explícito del mini-cart para otros componentes (Navbar, botones, etc.)
   const openMiniCart = () => setIsMiniCartOpen(true);
   const closeMiniCart = () => setIsMiniCartOpen(false);
+  const toggleMiniCartExpanded = () => setIsMiniCartExpanded(prev => !prev);
 
   // Valor del contexto
   const value = {
@@ -175,7 +178,9 @@ export const CartProvider = ({ children }) => {
     hasMultipleRestaurants,
     isMiniCartOpen,
     openMiniCart,
-    closeMiniCart
+    closeMiniCart,
+    isMiniCartExpanded,
+    toggleMiniCartExpanded
   };
 
   return (

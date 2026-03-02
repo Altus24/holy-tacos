@@ -5,10 +5,12 @@ import toast from 'react-hot-toast';
 import {
   GoogleMap,
   LoadScript,
-  Marker,
   DirectionsRenderer
 } from '@react-google-maps/api';
 import { useNavigationSteps } from '../../hooks/useNavigationSteps';
+import NavigationPanel from './NavigationPanel';
+
+const GOOGLE_MAP_LIBRARIES = ['places', 'marker'];
 
 const MAP_OPTIONS = {
   zoomControl: true,
@@ -17,7 +19,9 @@ const MAP_OPTIONS = {
   fullscreenControl: true,
   styles: [
     { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }
-  ]
+  ],
+  // Para AdvancedMarkerElement Google exige un mapId válido. Se inyecta vía env del frontend.
+  mapId: process.env.REACT_APP_GOOGLE_MAPS_MAP_ID || undefined
 };
 
 // Centro por defecto (Mendoza) cuando no hay ubicación ni restaurantes
@@ -60,7 +64,10 @@ const DriverMap = ({
     typeof window !== 'undefined' && !!window.google?.maps
   );
   const [center, setCenter] = useState(DEFAULT_CENTER);
-  const [directionsResponse, setDirectionsResponse] = useState(null);
+  const [driverToRestaurantDirections, setDriverToRestaurantDirections] = useState(null);
+  const [restaurantToClientDirections, setRestaurantToClientDirections] = useState(null);
+  const [driverToRestaurantInfo, setDriverToRestaurantInfo] = useState(null);
+  const [restaurantToClientInfo, setRestaurantToClientInfo] = useState(null);
   const [routeInfo, setRouteInfo] = useState(null);
   const [directionsLoading, setDirectionsLoading] = useState(false);
   /** Ruta al restaurante (doble clic): directions completo, rutas alternativas, índice seleccionado */
@@ -77,6 +84,9 @@ const DriverMap = ({
   const directionsDebounceRef = useRef(null);
   const trafficLayerRef = useRef(null);
   const lastSpokenStepRef = useRef(-1);
+  const driverMarkerRef = useRef(null);
+  const restaurantMarkersRef = useRef([]);
+  const clientMarkerRef = useRef(null);
 
   // No marcar scriptLoaded desde window.google: el mapa debe montarse siempre dentro LoadScript tras onLoad
 
@@ -138,56 +148,148 @@ const DriverMap = ({
       const avgLng = points.reduce((s, p) => s + p.lng, 0) / points.length;
       setCenter({ lat: avgLat, lng: avgLng });
     }
-  }, [driverLocation, deliveryCoords, orderRestaurantCoords, restaurantMarkers.length]);
+  }, [
+    driverLocation?.lat,
+    driverLocation?.lng,
+    deliveryCoords?.lat,
+    deliveryCoords?.lng,
+    orderRestaurantCoords?.lat,
+    orderRestaurantCoords?.lng,
+    restaurantMarkers.length
+  ]);
 
-  // Calcular ruta driver → restaurante (si hay) → cliente (con debounce para no saturar)
-  const calculateDirections = useCallback(() => {
-    if (!driverLocation || !deliveryCoords || !window.google?.maps) return;
+  // Calcular ruta driver → restaurante (tramo 1)
+  const calculateDriverToRestaurant = useCallback(() => {
+    if (!driverLocation || !orderRestaurantCoords || !window.google?.maps) {
+      setDriverToRestaurantDirections(null);
+      setDriverToRestaurantInfo(null);
+      return;
+    }
+
+    const origin = new window.google.maps.LatLng(driverLocation.lat, driverLocation.lng);
+    const destination = new window.google.maps.LatLng(orderRestaurantCoords.lat, orderRestaurantCoords.lng);
+    const svc = new window.google.maps.DirectionsService();
 
     setDirectionsLoading(true);
-    const origin = new window.google.maps.LatLng(driverLocation.lat, driverLocation.lng);
-    const destination = new window.google.maps.LatLng(deliveryCoords.lat, deliveryCoords.lng);
-    const waypoints = orderRestaurantCoords
-      ? [{ location: new window.google.maps.LatLng(orderRestaurantCoords.lat, orderRestaurantCoords.lng), stopover: true }]
-      : [];
-
-    const svc = new window.google.maps.DirectionsService();
     svc.route(
-      { origin, destination, waypoints, travelMode: 'DRIVING' },
+      { origin, destination, travelMode: 'DRIVING' },
       (result, status) => {
-        setDirectionsLoading(false);
-        if (status === 'OK') {
-          setDirectionsResponse(result);
+        if (status === 'OK' && result.routes?.length) {
+          setDriverToRestaurantDirections(result);
           const route = result.routes[0];
           if (route?.legs?.length) {
-            const totalDistance = route.legs.reduce((acc, leg) => acc + leg.distance.value, 0);
-            const totalDuration = route.legs.reduce((acc, leg) => acc + leg.duration.value, 0);
-            setRouteInfo({
+            const totalDistance = route.legs.reduce((acc, leg) => acc + (leg.distance?.value || 0), 0);
+            const totalDuration = route.legs.reduce((acc, leg) => acc + (leg.duration?.value || 0), 0);
+            setDriverToRestaurantInfo({
+              distanceMeters: totalDistance,
+              durationSeconds: totalDuration,
               distanceText: (totalDistance / 1000).toFixed(1) + ' km',
               durationText: Math.ceil(totalDuration / 60) + ' min'
             });
+          } else {
+            setDriverToRestaurantInfo(null);
           }
         } else {
-          setDirectionsResponse(null);
-          setRouteInfo(null);
+          setDriverToRestaurantDirections(null);
+          setDriverToRestaurantInfo(null);
         }
+        setDirectionsLoading(false);
       }
     );
-  }, [driverLocation, deliveryCoords, orderRestaurantCoords]);
+  }, [driverLocation, orderRestaurantCoords]);
 
-  // Debounce: recalcular ruta al moverse el driver (cada 3 s como máximo)
+  // Calcular ruta restaurante → cliente (tramo 2)
+  const calculateRestaurantToClient = useCallback(() => {
+    if (!orderRestaurantCoords || !deliveryCoords || !window.google?.maps) {
+      setRestaurantToClientDirections(null);
+      setRestaurantToClientInfo(null);
+      return;
+    }
+
+    const origin = new window.google.maps.LatLng(orderRestaurantCoords.lat, orderRestaurantCoords.lng);
+    const destination = new window.google.maps.LatLng(deliveryCoords.lat, deliveryCoords.lng);
+    const svc = new window.google.maps.DirectionsService();
+
+    setDirectionsLoading(true);
+    svc.route(
+      { origin, destination, travelMode: 'DRIVING' },
+      (result, status) => {
+        if (status === 'OK' && result.routes?.length) {
+          setRestaurantToClientDirections(result);
+          const route = result.routes[0];
+          if (route?.legs?.length) {
+            const totalDistance = route.legs.reduce((acc, leg) => acc + (leg.distance?.value || 0), 0);
+            const totalDuration = route.legs.reduce((acc, leg) => acc + (leg.duration?.value || 0), 0);
+            setRestaurantToClientInfo({
+              distanceMeters: totalDistance,
+              durationSeconds: totalDuration,
+              distanceText: (totalDistance / 1000).toFixed(1) + ' km',
+              durationText: Math.ceil(totalDuration / 60) + ' min'
+            });
+          } else {
+            setRestaurantToClientInfo(null);
+          }
+        } else {
+          setRestaurantToClientDirections(null);
+          setRestaurantToClientInfo(null);
+        }
+        setDirectionsLoading(false);
+      }
+    );
+  }, [orderRestaurantCoords, deliveryCoords]);
+
+  // ETA total sumando ambos tramos (si existen)
   useEffect(() => {
-    if (!scriptLoaded || !activeOrder || !driverLocation || !deliveryCoords) {
-      setDirectionsResponse(null);
+    const totalDistance =
+      (driverToRestaurantInfo?.distanceMeters || 0) +
+      (restaurantToClientInfo?.distanceMeters || 0);
+    const totalDuration =
+      (driverToRestaurantInfo?.durationSeconds || 0) +
+      (restaurantToClientInfo?.durationSeconds || 0);
+
+    if (!totalDistance || !totalDuration) {
       setRouteInfo(null);
       return;
     }
+
+    setRouteInfo({
+      distanceText: (totalDistance / 1000).toFixed(1) + ' km',
+      durationText: Math.ceil(totalDuration / 60) + ' min'
+    });
+  }, [driverToRestaurantInfo, restaurantToClientInfo]);
+
+  // Debounce: recalcular rutas al moverse el driver o cambiar la orden (cada 2.5 s como máximo)
+  useEffect(() => {
+    if (!scriptLoaded || !activeOrder) {
+      setDriverToRestaurantDirections(null);
+      setRestaurantToClientDirections(null);
+      setDriverToRestaurantInfo(null);
+      setRestaurantToClientInfo(null);
+      setRouteInfo(null);
+      return;
+    }
+
     if (directionsDebounceRef.current) clearTimeout(directionsDebounceRef.current);
-    directionsDebounceRef.current = setTimeout(calculateDirections, 2500);
+    directionsDebounceRef.current = setTimeout(() => {
+      calculateDriverToRestaurant();
+      calculateRestaurantToClient();
+    }, 2500);
+
     return () => {
       if (directionsDebounceRef.current) clearTimeout(directionsDebounceRef.current);
     };
-  }, [scriptLoaded, activeOrder, driverLocation, deliveryCoords, calculateDirections]);
+  }, [
+    scriptLoaded,
+    activeOrder?._id,
+    driverLocation?.lat,
+    driverLocation?.lng,
+    orderRestaurantCoords?.lat,
+    orderRestaurantCoords?.lng,
+    deliveryCoords?.lat,
+    deliveryCoords?.lng,
+    calculateDriverToRestaurant,
+    calculateRestaurantToClient
+  ]);
 
   const onMapLoad = useCallback((map) => {
     mapRef.current = map;
@@ -211,6 +313,100 @@ const DriverMap = ({
       if (trafficLayerRef.current?.setMap) trafficLayerRef.current.setMap(null);
     };
   }, []);
+
+  // Limpiar marcadores al desmontar
+  useEffect(() => {
+    return () => {
+      if (driverMarkerRef.current) {
+        driverMarkerRef.current.map = null;
+        driverMarkerRef.current = null;
+      }
+      if (clientMarkerRef.current) {
+        clientMarkerRef.current.map = null;
+        clientMarkerRef.current = null;
+      }
+      if (restaurantMarkersRef.current.length) {
+        restaurantMarkersRef.current.forEach(m => {
+          if (m) m.map = null;
+        });
+        restaurantMarkersRef.current = [];
+      }
+    };
+  }, []);
+
+  // Crear/actualizar marcadores usando AdvancedMarkerElement (Google Maps JS API moderno)
+  useEffect(() => {
+    if (
+      !scriptLoaded ||
+      !mapRef.current ||
+      !window.google?.maps?.marker?.AdvancedMarkerElement
+    ) {
+      return;
+    }
+
+    const AdvancedMarkerElement = window.google.maps.marker.AdvancedMarkerElement;
+
+    // Marcador del driver
+    if (driverLocation?.lat != null && driverLocation?.lng != null) {
+      const position = { lat: driverLocation.lat, lng: driverLocation.lng };
+      if (!driverMarkerRef.current) {
+        driverMarkerRef.current = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position,
+          title: 'Tu posición'
+        });
+      } else {
+        driverMarkerRef.current.position = position;
+        driverMarkerRef.current.title = 'Tu posición';
+      }
+    } else if (driverMarkerRef.current) {
+      driverMarkerRef.current.map = null;
+      driverMarkerRef.current = null;
+    }
+
+    // Marcadores de restaurantes
+    if (restaurantMarkersRef.current.length) {
+      restaurantMarkersRef.current.forEach(m => {
+        if (m) m.map = null;
+      });
+      restaurantMarkersRef.current = [];
+    }
+    if (restaurantMarkers.length) {
+      restaurantMarkersRef.current = restaurantMarkers.map(r => {
+        const pos = { lat: r.lat, lng: r.lng };
+        return new AdvancedMarkerElement({
+          map: mapRef.current,
+          position: pos,
+          title: r.name || 'Restaurante'
+        });
+      });
+    }
+
+    // Marcador del cliente (dirección de entrega)
+    if (deliveryCoords?.lat != null && deliveryCoords?.lng != null) {
+      const position = { lat: deliveryCoords.lat, lng: deliveryCoords.lng };
+      if (!clientMarkerRef.current) {
+        clientMarkerRef.current = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position,
+          title: 'Dirección de entrega'
+        });
+      } else {
+        clientMarkerRef.current.position = position;
+        clientMarkerRef.current.title = 'Dirección de entrega';
+      }
+    } else if (clientMarkerRef.current) {
+      clientMarkerRef.current.map = null;
+      clientMarkerRef.current = null;
+    }
+  }, [
+    scriptLoaded,
+    driverLocation?.lat,
+    driverLocation?.lng,
+    restaurantMarkers,
+    deliveryCoords?.lat,
+    deliveryCoords?.lng
+  ]);
 
   /**
    * Doble clic en pin de restaurante: calcular ruta con tráfico y alternativas.
@@ -339,6 +535,83 @@ const DriverMap = ({
     toast.success('Navegación iniciada. Seguí las instrucciones en pantalla.');
   }, [routeToRestaurant?.destination, driverLocation]);
 
+  /**
+   * Botón "Ir" para la orden activa:
+   * - En Android abre la app de Google Maps con navegación.
+   * - En web inicia la navegación en pantalla reutilizando el panel de instrucciones.
+   */
+  const handleGoToActiveOrder = useCallback(() => {
+    if (!activeOrder || !driverLocation || !orderRestaurantCoords || !window.google?.maps) return;
+
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const { lat, lng } = orderRestaurantCoords;
+
+    if (isAndroid) {
+      window.location.href = `google.navigation:q=${lat},${lng}`;
+      toast.success('Abriendo Google Maps');
+      return;
+    }
+
+    // Web: calcular ruta driver → restaurante y activar modo navegación en pantalla
+    setRouteToRestaurant(null);
+    setRouteToRestaurantLoading(true);
+
+    const origin = new window.google.maps.LatLng(driverLocation.lat, driverLocation.lng);
+    const destination = new window.google.maps.LatLng(lat, lng);
+    const svc = new window.google.maps.DirectionsService();
+    const restaurant = {
+      lat,
+      lng,
+      name: activeOrder.restaurantId?.name || activeOrder.restaurantName || 'Restaurante'
+    };
+
+    const request = {
+      origin,
+      destination,
+      travelMode: 'DRIVING'
+    };
+
+    svc.route(request, (result, status) => {
+      setRouteToRestaurantLoading(false);
+      if (status !== 'OK' || !result.routes?.length) {
+        toast.error('No se pudo calcular la ruta para la orden.');
+        return;
+      }
+
+      const route = result.routes[0];
+      const leg = route?.legs?.[0];
+      const duration = leg?.duration?.value ?? 0;
+      const durationInTraffic = leg?.duration_in_traffic?.value ?? duration;
+      const distanceText = leg?.distance?.text ?? '';
+      const durationText = leg?.duration?.text ?? '';
+
+      const routeSummaries = [{
+        index: 0,
+        duration,
+        durationInTraffic,
+        distanceText,
+        durationText,
+        durationInTrafficText: leg?.duration_in_traffic?.text ?? durationText
+      }];
+
+      setRouteToRestaurant({
+        fullResult: result,
+        restaurantName: restaurant.name,
+        destination: { lat: restaurant.lat, lng: restaurant.lng },
+        routes: result.routes,
+        routeSummaries,
+        selectedRouteIndex: 0,
+        distanceText,
+        durationText: leg?.duration_in_traffic?.text ?? durationText
+      });
+
+      setNavigationMode(true);
+      setCurrentStepIndex(0);
+      lastSpokenStepRef.current = -1;
+      toast.success('Navegación iniciada. Seguí las instrucciones en pantalla.');
+    });
+  }, [activeOrder, driverLocation, orderRestaurantCoords]);
+
   /** Abrir navegación en Google Maps (como Uber/PedidosYa). En Android usa intent para que aparezca "Iniciar". */
   const handleOpenInGoogleMaps = useCallback(() => {
     if (!routeToRestaurant?.destination || !driverLocation) return;
@@ -445,54 +718,11 @@ const DriverMap = ({
     onCenterMe?.();
   }, [driverLocation, onCenterMe, navigationMode]);
 
-  // Iconos: azul driver, rojo/naranja restaurante, verde cliente
-  const getIcons = () => {
-    if (typeof window === 'undefined' || !window.google?.maps) return null;
-    return {
-      driver: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="18" cy="18" r="16" fill="#2563eb" stroke="white" stroke-width="3"/>
-            <path d="M11 20h14l-2.5-5h-9z" fill="white"/>
-            <circle cx="14" cy="17" r="1.5" fill="white"/>
-            <circle cx="22" cy="17" r="1.5" fill="white"/>
-          </svg>
-        `),
-        scaledSize: { width: 36, height: 36 },
-        anchor: { x: 18, y: 36 }
-      },
-      restaurant: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="16" cy="16" r="14" fill="#dc2626" stroke="white" stroke-width="2"/>
-            <path d="M10 12h12v6H10z" fill="white"/>
-            <path d="M12 8h8v4h-8z" fill="white"/>
-          </svg>
-        `),
-        scaledSize: { width: 32, height: 32 },
-        anchor: { x: 16, y: 32 }
-      },
-      client: {
-        url: 'data:image/svg+xml;charset=UTF-8,' + encodeURIComponent(`
-          <svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <circle cx="16" cy="16" r="14" fill="#16a34a" stroke="white" stroke-width="2"/>
-            <path d="M10 14h12v5H10z" fill="white"/>
-            <path d="M12 10h8v4h-8z" fill="white"/>
-          </svg>
-        `),
-        scaledSize: { width: 32, height: 32 },
-        anchor: { x: 16, y: 32 }
-      }
-    };
-  };
-
   const containerStyle = {
     width: '100%',
     height: typeof mapHeight === 'number' ? `${mapHeight}px` : mapHeight,
     borderRadius: '8px'
   };
-
-  const icons = scriptLoaded ? getIcons() : null;
 
   if (!process.env.REACT_APP_GOOGLE_MAPS_API_KEY) {
     return (
@@ -535,6 +765,17 @@ const DriverMap = ({
                 className="absolute bottom-4 right-4 z-10 px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg shadow hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Centrar en mi posición
+              </button>
+            )}
+
+            {/* Botón móvil "Ir" para la orden activa: inicia navegación hacia el restaurante */}
+            {activeOrder && !navigationMode && !routeToRestaurant && (driverToRestaurantDirections || restaurantToClientDirections) && (
+              <button
+                type="button"
+                onClick={handleGoToActiveOrder}
+                className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 px-6 py-3 bg-blue-600 text-white text-base font-semibold rounded-full shadow-lg hover:bg-blue-700"
+              >
+                Ir
               </button>
             )}
 
@@ -639,95 +880,17 @@ const DriverMap = ({
 
             {/* Modo navegación: barra superior con próxima instrucción + panel de pasos */}
             {navigationMode && routeToRestaurant && (
-              <>
-                {/* Barra superior: próxima instrucción + ETA + acciones */}
-                <div className="absolute top-0 left-0 right-0 z-20 bg-white/95 backdrop-blur border-b border-gray-200 shadow-md">
-                  <div className="px-4 py-3 flex items-start justify-between gap-2">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-xs font-medium text-green-600 uppercase tracking-wide">Próxima instrucción</p>
-                      <p className="text-base font-semibold text-gray-900 mt-0.5">
-                        {navigationSteps[currentStepIndex]?.instruction || 'Llegando al destino'}
-                      </p>
-                      {navigationSteps[currentStepIndex] && (
-                        <p className="text-sm text-gray-500 mt-1">
-                          {navigationSteps[currentStepIndex].distanceText}
-                          {navigationSteps[currentStepIndex].durationText ? ` · ${navigationSteps[currentStepIndex].durationText}` : ''}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <span className="text-sm font-medium text-gray-600">
-                        {routeToRestaurant.distanceText} · ~{routeToRestaurant.durationText}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={handleRecalculateRoute}
-                        disabled={routeToRestaurantLoading}
-                        className="p-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50"
-                        title="Recalcular ruta"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleEndNavigation}
-                        className="px-3 py-1.5 bg-red-100 text-red-700 text-sm font-medium rounded-lg hover:bg-red-200"
-                      >
-                        Finalizar navegación
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Panel deslizable de instrucciones (lista de pasos) */}
-                <div className="absolute top-[88px] left-2 right-2 bottom-14 z-10 overflow-hidden flex flex-col max-h-[45vh] bg-white/95 backdrop-blur rounded-xl border border-gray-200 shadow-lg">
-                  <div className="px-3 py-2 border-b border-gray-100 flex items-center justify-between">
-                    <span className="text-sm font-semibold text-gray-700">Instrucciones paso a paso</span>
-                    <span className="text-xs text-gray-500">
-                      Paso {Math.min(currentStepIndex + 1, navigationSteps.length)} de {navigationSteps.length}
-                    </span>
-                  </div>
-                  <div className="overflow-y-auto flex-1 py-2">
-                    {navigationSteps.map((step, i) => (
-                      <div
-                        key={i}
-                        className={`px-4 py-2 flex gap-3 ${i === currentStepIndex ? 'bg-green-50 border-l-4 border-green-500' : 'border-l-4 border-transparent'}`}
-                      >
-                        <span className="text-sm font-medium text-gray-400 shrink-0 w-6">{i + 1}</span>
-                        <div>
-                          <p className={`text-sm ${i === currentStepIndex ? 'font-semibold text-gray-900' : 'text-gray-600'}`}>
-                            {step.instruction}
-                          </p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {step.distanceText}
-                            {step.durationText ? ` · ${step.durationText}` : ''}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Abrir en app externa (Google Maps / Waze) */}
-                <div className="absolute bottom-4 left-4 right-4 z-10 flex flex-wrap justify-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleOpenInGoogleMaps}
-                    className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 border border-blue-200"
-                  >
-                    Google Maps
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleOpenInWaze}
-                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 border border-gray-200"
-                  >
-                    Waze
-                  </button>
-                </div>
-              </>
+              <NavigationPanel
+                steps={navigationSteps}
+                currentStepIndex={currentStepIndex}
+                routeDistanceText={routeToRestaurant.distanceText}
+                routeDurationText={routeToRestaurant.durationText}
+                onRecalculate={handleRecalculateRoute}
+                onEnd={handleEndNavigation}
+                onOpenGoogleMaps={handleOpenInGoogleMaps}
+                onOpenWaze={handleOpenInWaze}
+                isRecalculating={routeToRestaurantLoading}
+              />
             )}
             {routeToRestaurantLoading && (
               <div className="absolute top-2 left-2 z-10 bg-white/95 rounded-lg shadow px-3 py-2 text-sm text-gray-600">
@@ -749,42 +912,46 @@ const DriverMap = ({
               options={MAP_OPTIONS}
               onLoad={onMapLoad}
             >
-              {/* Marcador del driver */}
-              {driverLocation && (
-                <Marker
-                  position={driverLocation}
-                  icon={icons.driver}
-                  title="Tu posición"
-                  animation={window.google?.maps?.Animation?.BOUNCE}
-                />
-              )}
 
-              {/* Marcadores de restaurantes: doble clic crea ruta desde tu posición */}
-              {restaurantMarkers.map((r) => (
-                <Marker
-                  key={r._id}
-                  position={{ lat: r.lat, lng: r.lng }}
-                  icon={icons.restaurant}
-                  title={`${r.name} (doble clic para ruta)`}
-                  onDblClick={() => handleRestaurantDblClick(r)}
-                />
-              ))}
-
-              {/* Marcador del cliente (solo si hay orden activa) */}
-              {deliveryCoords && (
-                <Marker
-                  position={deliveryCoords}
-                  icon={icons.client}
-                  title="Dirección de entrega"
-                />
-              )}
-
-              {/* Ruta: al restaurante (doble clic, con ruta seleccionada) o a la orden activa */}
-              {(routeToRestaurantDirections || directionsResponse) && (
+              {/* Ruta seleccionada por doble clic en restaurante (tiene prioridad sobre la ruta de la orden activa) */}
+              {routeToRestaurantDirections && (
                 <DirectionsRenderer
-                  directions={routeToRestaurantDirections ?? directionsResponse}
+                  directions={routeToRestaurantDirections}
                   options={{
                     polylineOptions: { strokeColor: '#2563eb', strokeWeight: 4, strokeOpacity: 0.9 },
+                    suppressMarkers: true
+                  }}
+                />
+              )}
+
+              {/* Rutas de la orden activa: driver → restaurante (sólida azul) y restaurante → cliente (naranja punteada) */}
+              {!routeToRestaurantDirections && driverToRestaurantDirections && (
+                <DirectionsRenderer
+                  directions={driverToRestaurantDirections}
+                  options={{
+                    polylineOptions: { strokeColor: '#2563eb', strokeWeight: 4, strokeOpacity: 0.9 },
+                    suppressMarkers: true
+                  }}
+                />
+              )}
+
+              {!routeToRestaurantDirections && restaurantToClientDirections && (
+                <DirectionsRenderer
+                  directions={restaurantToClientDirections}
+                  options={{
+                    polylineOptions: {
+                      strokeColor: '#f97316',
+                      strokeWeight: 4,
+                      strokeOpacity: 0.9,
+                      // Patrón punteado usando iconos espaciados
+                      icons: [{
+                        icon: {
+                          path: window.google?.maps?.SymbolPath?.FORWARD_OPEN_ARROW || window.google?.maps?.SymbolPath?.CIRCLE
+                        },
+                        offset: '0',
+                        repeat: '24px'
+                      }]
+                    },
                     suppressMarkers: true
                   }}
                 />
@@ -798,10 +965,10 @@ const DriverMap = ({
     <div className={`relative ${className}`}>
       <LoadScript
         googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}
-        libraries={['places']}
+        libraries={GOOGLE_MAP_LIBRARIES}
         onLoad={() => setScriptLoaded(true)}
       >
-        {!scriptLoaded || !icons ? loadingPlaceholder : mapContent}
+        {!scriptLoaded ? loadingPlaceholder : mapContent}
       </LoadScript>
     </div>
   );

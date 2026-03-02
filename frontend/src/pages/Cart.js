@@ -1,6 +1,8 @@
 // Página del carrito de compras en Holy Tacos
+// Bloquea "Proceder al Pago" si el cliente no tiene perfil completo
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
@@ -8,7 +10,7 @@ import BackButton from '../components/BackButton';
 import axios from 'axios';
 
 const Cart = () => {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user, refreshUser } = useAuth();
   const {
     cartItems,
     updateQuantity,
@@ -22,6 +24,11 @@ const Cart = () => {
   } = useCart();
 
   const [pendingOrders, setPendingOrders] = useState([]);
+
+  // Refrescar usuario al montar para tener isProfileComplete actualizado
+  useEffect(() => {
+    if (isAuthenticated()) refreshUser?.();
+  }, [isAuthenticated, refreshUser]);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -209,6 +216,22 @@ const Cart = () => {
                     <span className="text-orange-600">${getFinalTotal()}</span>
                   </div>
 
+                  {/* Bloqueo: cliente sin perfil completo no puede ir a checkout */}
+                  {user?.role === 'client' && user?.isProfileComplete !== true && (
+                    <div className="bg-amber-50 border border-amber-300 rounded-lg p-4 mb-4">
+                      <p className="text-amber-800 text-sm font-medium mb-2">
+                        Por favor completa tu perfil para continuar y poder hacer pedidos.
+                      </p>
+                      <Link
+                        to="/profile"
+                        className="inline-block bg-amber-600 text-white py-2 px-4 rounded-lg hover:bg-amber-700 text-sm font-medium"
+                        onClick={() => toast('Completa nombre, teléfono y dirección de entrega con ubicación en mapa.')}
+                      >
+                        Ir a perfil
+                      </Link>
+                    </div>
+                  )}
+
                   {/* Advertencia si hay múltiples restaurantes */}
                   {hasMultipleRestaurants() && (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
@@ -221,12 +244,18 @@ const Cart = () => {
 
                   {/* Botones de acción */}
                   <div className="space-y-3">
-                    <Link
-                      to="/checkout"
-                      className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 transition-colors font-medium text-center block"
-                    >
-                      Proceder al Pago
-                    </Link>
+                    {user?.role === 'client' && user?.isProfileComplete !== true ? (
+                      <span className="w-full bg-gray-400 text-white py-3 px-4 rounded-lg font-medium text-center block cursor-not-allowed">
+                        Proceder al Pago (completá tu perfil primero)
+                      </span>
+                    ) : (
+                      <Link
+                        to="/checkout"
+                        className="w-full bg-orange-600 text-white py-3 px-4 rounded-lg hover:bg-orange-700 transition-colors font-medium text-center block"
+                      >
+                        Proceder al Pago
+                      </Link>
+                    )}
                     <Link
                       to="/restaurants"
                       className="w-full border border-gray-300 text-gray-700 py-3 px-4 rounded-lg hover:bg-gray-50 transition-colors font-medium text-center block"

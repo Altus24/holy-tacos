@@ -1,7 +1,10 @@
 // Página de registro para Holy Tacos
+// Tras registro exitoso: token guardado, carrito vaciado y redirección a /profile para completar perfil
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import Layout from '../components/Layout';
 import BackButton from '../components/BackButton';
 
@@ -14,9 +17,9 @@ const Register = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState(false);
 
   const { register } = useAuth();
+  const { clearCart } = useCart();
   const navigate = useNavigate();
 
   // Manejar cambios en los inputs
@@ -58,7 +61,6 @@ const Register = () => {
     e.preventDefault();
     setLoading(true);
     setError('');
-    setSuccess(false);
 
     if (!validateForm()) {
       setLoading(false);
@@ -69,17 +71,20 @@ const Register = () => {
       const result = await register(formData.email, formData.password, formData.role);
 
       if (result.success) {
-        setSuccess(true);
-        setTimeout(() => {
-          // Redirigir según el rol del usuario
-          if (result.user.role === 'admin') {
-            navigate('/admin/dashboard');
-          } else if (result.user.role === 'driver') {
-            navigate('/driver/map');
-          } else {
-            navigate('/');
-          }
-        }, 2000);
+        // Cliente: vaciar carrito y redirigir a perfil para completar datos
+        if (result.user.role === 'client') {
+          clearCart();
+          toast.success('Registro exitoso. Completa tu perfil para empezar a pedir.');
+          navigate('/profile', { state: { fromRegister: true } });
+        } else if (result.user.role === 'driver') {
+          // Conductor: redirigir a perfil para completar datos (teléfono, vehículo, licencia, documentos)
+          toast.success('Registro exitoso. Completa tu perfil para empezar a trabajar como driver.');
+          navigate('/profile', { state: { fromRegister: true } });
+        } else if (result.user.role === 'admin') {
+          navigate('/admin/dashboard');
+        } else {
+          navigate('/');
+        }
       } else {
         setError(result.message);
       }
@@ -89,29 +94,6 @@ const Register = () => {
       setLoading(false);
     }
   };
-
-  if (success) {
-    return (
-      <Layout>
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-red-50 py-12 px-4">
-          <div className="max-w-md w-full">
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md mb-4">
-              ¡Registro exitoso! Redirigiendo...
-            </div>
-            <div className="bg-white py-8 px-6 shadow-lg rounded-lg text-center">
-              <div className="text-6xl mb-4">✅</div>
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                ¡Registro completado!
-              </h2>
-              <p className="text-gray-600">
-                Tu cuenta ha sido creada exitosamente. Serás redirigido automáticamente.
-              </p>
-            </div>
-          </div>
-        </div>
-      </Layout>
-    );
-  }
 
   return (
     <Layout>
@@ -248,9 +230,9 @@ const Register = () => {
             <div className="mt-6">
               <p className="text-xs text-gray-600 text-center">
                 Al crear una cuenta, aceptas nuestros{' '}
-                <a href="#" className="text-orange-600 hover:text-orange-700">
+                <span role="link" className="text-orange-600 hover:text-orange-700 cursor-pointer">
                   términos y condiciones
-                </a>
+                </span>
               </p>
             </div>
           </div>

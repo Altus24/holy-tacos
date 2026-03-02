@@ -1,6 +1,7 @@
-// Componente de navegación para Holy Tacos — con condicionales por rol
+// Navegación condicional por rol: client (Home, Restaurantes, Carrito, Órdenes, Perfil); driver (Dashboard, Órdenes, Mapa, Estadísticas, Perfil, Toggle). Minimalista, mobile-first.
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { Home, MapPin, Package, User, BarChart3, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import axios from 'axios';
@@ -137,8 +138,8 @@ const Navbar = () => {
     if (!isAuthenticated()) {
       return (
         <>
-          <Link to="/" className={linkClass('/')}>Inicio</Link>
-          <Link to="/restaurants" className={linkClass('/restaurants')}>Restaurantes</Link>
+          <Link to="/" className={`flex items-center gap-1.5 ${linkClass('/')}`}><Home className="w-4 h-4" /> Inicio</Link>
+          <Link to="/restaurants" className={`flex items-center gap-1.5 ${linkClass('/restaurants')}`}><MapPin className="w-4 h-4" /> Restaurantes</Link>
         </>
       );
     }
@@ -146,19 +147,11 @@ const Navbar = () => {
     if (isDriver()) {
       return (
         <>
-          <Link to="/driver/map" className={linkClass('/driver/map')}>
-            Mapa
-          </Link>
-          {/* Link a entregas con badge */}
-          <Link to="/driver/orders" className={`relative ${linkClass('/driver/orders')}`}>
-            Mis Entregas
-            <Badge count={pendingCount} />
-          </Link>
-
-          {/* Toggle de disponibilidad */}
+          <Link to="/driver/orders" className={`relative flex items-center gap-1.5 ${linkClass('/driver/orders')}`}><Package className="w-4 h-4" /> Órdenes <Badge count={pendingCount} /></Link>
+          <Link to="/driver/map" className={`flex items-center gap-1.5 ${linkClass('/driver/map')}`}><MapPin className="w-4 h-4" /> Mapa</Link>
+          <Link to="/driver/stats" className={`flex items-center gap-1.5 ${linkClass('/driver/stats')}`}><BarChart3 className="w-4 h-4" /> Estadísticas</Link>
+          <Link to="/driver/profile" className={`flex items-center gap-1.5 ${linkClass('/driver/profile')}`}><User className="w-4 h-4" /> Perfil</Link>
           <AvailabilityToggle compact={false} />
-
-          {/* GPS indicator */}
           <GpsIndicator />
         </>
       );
@@ -167,26 +160,20 @@ const Navbar = () => {
     if (isAdmin()) {
       return (
         <>
-          <Link to="/profile" className={linkClass('/profile')}>Perfil</Link>
-          <Link to="/admin/dashboard" className={linkClass('/admin/dashboard')}>Dashboard</Link>
+          <Link to="/profile" className={`flex items-center gap-1.5 ${linkClass('/profile')}`}><User className="w-4 h-4" /> Perfil</Link>
+          <Link to="/admin/dashboard" className={`flex items-center gap-1.5 ${linkClass('/admin/dashboard')}`}>Dashboard</Link>
         </>
       );
     }
 
-    // Cliente
+    // Cliente: Home, Restaurantes, Carrito (badge), Órdenes, Perfil
     return (
       <>
-        <Link to="/" className={linkClass('/')}>Inicio</Link>
-        <Link to="/restaurants" className={linkClass('/restaurants')}>Restaurantes</Link>
-        <Link to="/orders" className={linkClass('/orders')}>Mis Pedidos</Link>
-        <Link to="/cart" className={`relative ${linkClass('/cart')}`}>
-          Carrito
-          {getTotalItemsCount() > 0 && (
-            <span className="absolute -top-2 -right-3 bg-orange-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
-              {getTotalItemsCount()}
-            </span>
-          )}
-        </Link>
+        <Link to="/" className={`flex items-center gap-1.5 ${linkClass('/')}`}><Home className="w-4 h-4" /> Inicio</Link>
+        <Link to="/restaurants" className={`flex items-center gap-1.5 ${linkClass('/restaurants')}`}><MapPin className="w-4 h-4" /> Restaurantes</Link>
+        <Link to="/cart" className={`relative flex items-center gap-1.5 ${linkClass('/cart')}`}><Package className="w-4 h-4" /> Carrito <Badge count={getTotalItemsCount()} /></Link>
+        <Link to="/orders" className={`flex items-center gap-1.5 ${linkClass('/orders')}`}>Órdenes</Link>
+        <Link to="/profile" className={`flex items-center gap-1.5 ${linkClass('/profile')}`}><User className="w-4 h-4" /> Perfil</Link>
       </>
     );
   };
@@ -195,11 +182,11 @@ const Navbar = () => {
     if (!isAuthenticated()) {
       return (
         <>
-          <Link to="/" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Inicio</Link>
-          <Link to="/restaurants" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Restaurantes</Link>
+          <Link to="/" className="flex items-center gap-2 py-2 text-gray-700 hover:text-orange-600 font-medium"><Home className="w-4 h-4" /> Inicio</Link>
+          <Link to="/restaurants" className="flex items-center gap-2 py-2 text-gray-700 hover:text-orange-600 font-medium"><MapPin className="w-4 h-4" /> Restaurantes</Link>
           <div className="border-t border-gray-200 my-2" />
           <Link to="/login" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Iniciar Sesión</Link>
-          <Link to="/register" className="block py-2 text-orange-600 hover:text-orange-700 font-semibold">Registrarse</Link>
+          <Link to="/register" className="block py-2 text-orange-600 font-semibold">Registrarse</Link>
         </>
       );
     }
@@ -207,28 +194,19 @@ const Navbar = () => {
     if (isDriver()) {
       return (
         <>
-          {/* Toggle prominente arriba */}
-          <div className="flex items-center justify-between py-3 px-1 border-b border-gray-200 mb-2">
+          <div className="flex items-center justify-between py-3 border-b border-gray-200 mb-2">
             <AvailabilityToggle compact={false} />
             <GpsIndicator />
           </div>
-
-          <Link to="/driver/map" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Mapa</Link>
           <Link to="/driver/orders" className="flex items-center justify-between py-2 text-gray-700 hover:text-orange-600 font-medium">
-            <span>Mis Entregas</span>
-            {pendingCount > 0 && (
-              <span className="bg-orange-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
-                {pendingCount}
-              </span>
-            )}
+            <span className="flex items-center gap-2"><Package className="w-4 h-4" /> Órdenes</span>
+            {pendingCount > 0 && <span className="bg-orange-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">{pendingCount}</span>}
           </Link>
-
-          <Link to="/profile" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Mi Perfil</Link>
-
+          <Link to="/driver/map" className="flex items-center gap-2 py-2 text-gray-700 hover:text-orange-600 font-medium"><MapPin className="w-4 h-4" /> Mapa</Link>
+          <Link to="/driver/stats" className="flex items-center gap-2 py-2 text-gray-700 hover:text-orange-600 font-medium"><BarChart3 className="w-4 h-4" /> Estadísticas</Link>
+          <Link to="/driver/profile" className="flex items-center gap-2 py-2 text-gray-700 hover:text-orange-600 font-medium"><User className="w-4 h-4" /> Perfil</Link>
           <div className="border-t border-gray-200 my-2" />
-          <button onClick={handleLogout} className="block w-full text-left py-2 text-red-600 hover:text-red-700 font-medium">
-            Cerrar Sesión
-          </button>
+          <button onClick={handleLogout} className="flex items-center gap-2 w-full text-left py-2 text-red-600 hover:text-red-700 font-medium"><LogOut className="w-4 h-4" /> Cerrar Sesión</button>
         </>
       );
     }
@@ -236,12 +214,10 @@ const Navbar = () => {
     if (isAdmin()) {
       return (
         <>
-          <Link to="/profile" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Perfil</Link>
+          <Link to="/profile" className="flex items-center gap-2 py-2 text-gray-700 hover:text-orange-600 font-medium"><User className="w-4 h-4" /> Perfil</Link>
           <Link to="/admin/dashboard" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Dashboard</Link>
           <div className="border-t border-gray-200 my-2" />
-          <button onClick={handleLogout} className="block w-full text-left py-2 text-red-600 hover:text-red-700 font-medium">
-            Cerrar Sesión
-          </button>
+          <button onClick={handleLogout} className="flex items-center gap-2 w-full text-left py-2 text-red-600 hover:text-red-700 font-medium"><LogOut className="w-4 h-4" /> Cerrar Sesión</button>
         </>
       );
     }
@@ -249,22 +225,16 @@ const Navbar = () => {
     // Cliente
     return (
       <>
-        <Link to="/" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Inicio</Link>
-        <Link to="/restaurants" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Restaurantes</Link>
-        <Link to="/orders" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Mis Pedidos</Link>
+        <Link to="/" className="flex items-center gap-2 py-2 text-gray-700 hover:text-orange-600 font-medium"><Home className="w-4 h-4" /> Inicio</Link>
+        <Link to="/restaurants" className="flex items-center gap-2 py-2 text-gray-700 hover:text-orange-600 font-medium"><MapPin className="w-4 h-4" /> Restaurantes</Link>
+        <Link to="/orders" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Órdenes</Link>
         <Link to="/cart" className="flex items-center justify-between py-2 text-gray-700 hover:text-orange-600 font-medium">
-          <span>Carrito</span>
-          {getTotalItemsCount() > 0 && (
-            <span className="bg-orange-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">
-              {getTotalItemsCount()}
-            </span>
-          )}
+          <span className="flex items-center gap-2"><Package className="w-4 h-4" /> Carrito</span>
+          {getTotalItemsCount() > 0 && <span className="bg-orange-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-bold">{getTotalItemsCount()}</span>}
         </Link>
-        <Link to="/profile" className="block py-2 text-gray-700 hover:text-orange-600 font-medium">Perfil</Link>
+        <Link to="/profile" className="flex items-center gap-2 py-2 text-gray-700 hover:text-orange-600 font-medium"><User className="w-4 h-4" /> Perfil</Link>
         <div className="border-t border-gray-200 my-2" />
-        <button onClick={handleLogout} className="block w-full text-left py-2 text-red-600 hover:text-red-700 font-medium">
-          Cerrar Sesión
-        </button>
+        <button onClick={handleLogout} className="flex items-center gap-2 w-full text-left py-2 text-red-600 hover:text-red-700 font-medium"><LogOut className="w-4 h-4" /> Cerrar Sesión</button>
       </>
     );
   };
@@ -299,9 +269,9 @@ const Navbar = () => {
                 </Link>
                 <button
                   onClick={handleLogout}
-                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+                  className="flex items-center gap-1.5 bg-gray-100 text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-200 text-sm font-medium"
                 >
-                  Salir
+                  <LogOut className="w-4 h-4" /> Salir
                 </button>
               </>
             ) : (
@@ -318,21 +288,11 @@ const Navbar = () => {
 
           {/* Hamburger button — mobile */}
           <button
-            className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-orange-600 hover:bg-orange-50 transition-colors"
+            className="md:hidden inline-flex items-center justify-center p-2 rounded-md text-gray-700 hover:text-orange-600 hover:bg-orange-50"
             onClick={() => setMobileOpen(prev => !prev)}
             aria-label="Abrir menú"
           >
-            {mobileOpen ? (
-              // X icon
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            ) : (
-              // Hamburger icon
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
-            )}
+            {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
         </div>
       </div>

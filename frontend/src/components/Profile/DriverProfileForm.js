@@ -36,6 +36,8 @@ const DriverProfileForm = ({
   const [uploadError, setUploadError] = useState(null);
   const [localAvailability, setLocalAvailability] = useState(user?.driverProfile?.isAvailable || false);
   const [savingSection, setSavingSection] = useState(null);
+  // Mensaje de error al intentar guardar perfil sin datos mínimos
+  const [minimalError, setMinimalError] = useState(null);
   const [workingAreasList, setWorkingAreasList] = useState(
     () => (user?.driverProfile?.workingAreas && Array.isArray(user.driverProfile.workingAreas))
       ? [...user.driverProfile.workingAreas]
@@ -116,19 +118,38 @@ const DriverProfileForm = ({
     }
   });
 
-  const handleFormSubmit = async (data) => {
+  // Validar que estén completos: teléfono, vehículo (tipo y placa), licencia y documentos
+  const isMinimalComplete = (data) => {
+    const hasPhone = data.phone?.trim();
+    const hasVehicle = data.vehicleType && data.vehiclePlate?.trim();
+    const hasLicense = data.licenseNumber?.trim() && data.licenseExpiration;
+    const docs = user?.driverProfile?.documents;
+    const hasDocuments = docs?.licenseFront && docs?.licenseBack && docs?.profileVerification;
+    return !!(hasPhone && hasVehicle && hasLicense && hasDocuments);
+  };
+
+  const handleFormSubmit = async () => {
+    setMinimalError(null);
+    // Los campos están en otros formularios; usar watch() para leer valores actuales
+    const data = watch();
+    if (!isMinimalComplete(data)) {
+      setMinimalError(
+        'Completá teléfono, datos del vehículo (tipo y placa), licencia (número y vencimiento) y los tres documentos (frente, reverso y verificación) para guardar el perfil.'
+      );
+      return;
+    }
     const profileData = {
-      name: data.name,
-      phone: data.phone,
+      name: data.name?.trim(),
+      phone: data.phone?.trim(),
       driverProfile: {
         vehicle: {
           type: data.vehicleType,
           brand: data.vehicleBrand,
           model: data.vehicleModel,
-          plate: data.vehiclePlate.toUpperCase(),
+          plate: (data.vehiclePlate || '').toUpperCase(),
           color: data.vehicleColor
         },
-        licenseNumber: data.licenseNumber.toUpperCase(),
+        licenseNumber: (data.licenseNumber || '').toUpperCase(),
         licenseExpiration: data.licenseExpiration ? new Date(data.licenseExpiration) : null,
         workingAreas: Array.isArray(workingAreasList) ? workingAreasList : [],
         isAvailable: localAvailability
@@ -376,6 +397,7 @@ const DriverProfileForm = ({
             <input
               type="text"
               {...register('name', { required: 'El nombre es obligatorio' })}
+              placeholder="Ingresa tu nombre completo"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-white"
             />
             {errors.name && (
@@ -415,7 +437,7 @@ const DriverProfileForm = ({
                   message: 'Formato de teléfono inválido'
                 }
               })}
-              placeholder="+549123456789"
+              placeholder="Ingresa tu teléfono (ej: +54 9 11 1234-5678)"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-white"
             />
             {errors.phone && (
@@ -435,7 +457,7 @@ const DriverProfileForm = ({
       {/* Información del vehículo */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
-          Información del Vehículo
+          Detalles del vehículo
         </h2>
 
         <form onSubmit={handleSubmit(handleSaveVehicle)} className="space-y-4">
@@ -462,7 +484,7 @@ const DriverProfileForm = ({
               <input
                 type="text"
                 {...register('vehicleBrand')}
-                placeholder="Ej: Honda"
+                placeholder="Marca (ej: Honda)"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-white"
               />
             </div>
@@ -471,7 +493,7 @@ const DriverProfileForm = ({
               <input
                 type="text"
                 {...register('vehicleModel')}
-                placeholder="Ej: CG 150"
+                placeholder="Modelo (ej: CG 150)"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-white"
               />
             </div>
@@ -520,10 +542,10 @@ const DriverProfileForm = ({
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Número de licencia *
             </label>
-            <input
-              type="text"
-              {...register('licenseNumber', { required: 'El número de licencia es obligatorio' })}
-              placeholder="Ej: LC12345678"
+              <input
+                type="text"
+                {...register('licenseNumber', { required: 'El número de licencia es obligatorio' })}
+                placeholder="Número de licencia (ej: LC12345678)"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-white uppercase"
             />
             {errors.licenseNumber && (
@@ -732,15 +754,30 @@ const DriverProfileForm = ({
         }}
       />
 
-      {/* Botón volver */}
-      <div className="flex justify-end">
-        <button
-          onClick={onCancel}
-          className="px-6 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-        >
-          Volver al perfil
-        </button>
-      </div>
+      {/* Guardar perfil completo (valida teléfono, vehículo, licencia y documentos); usa watch() para valores actuales */}
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col items-end gap-2" noValidate>
+        {minimalError && (
+          <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2 w-full">
+            {minimalError}
+          </p>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-6 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
+            Volver al perfil
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 font-medium disabled:opacity-50"
+          >
+            Guardar perfil
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

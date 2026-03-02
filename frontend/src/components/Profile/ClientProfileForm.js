@@ -34,6 +34,7 @@ const ClientProfileForm = ({
   });
   const [showAddressForm, setShowAddressForm] = useState(false);
   const [editingAddress, setEditingAddress] = useState(null); // { ...address, index }
+  const [minimalError, setMinimalError] = useState(null); // Mensaje si intentan guardar sin datos mínimos
 
   const {
     register,
@@ -53,10 +54,28 @@ const ClientProfileForm = ({
     ? addresses[defaultIndex]
     : null;
 
+  // Validación mínima: nombre, teléfono y dirección con calle, número y ubicación en mapa (lat/lng) para poder hacer pedidos
+  const hasValidCoords = (addr) => {
+    const coords = addr?.location?.coordinates;
+    return Array.isArray(coords) && coords.length >= 2 && (Number(coords[0]) !== 0 || Number(coords[1]) !== 0);
+  };
+  const isMinimalComplete = (data, defAddr) => {
+    const hasName = data.name?.trim();
+    const hasPhone = data.phone?.trim();
+    const hasAddress = defAddr && defAddr.street?.trim() && defAddr.number?.trim();
+    const hasLocation = hasValidCoords(defAddr);
+    return hasName && hasPhone && hasAddress && hasLocation;
+  };
+
   const handleFormSubmit = (data) => {
+    setMinimalError(null);
+    if (!isMinimalComplete(data, defaultAddress)) {
+      setMinimalError('Completá nombre, teléfono y una dirección de entrega (calle, número y ubicación en el mapa) para poder hacer pedidos.');
+      return;
+    }
     const profileData = {
-      name: data.name,
-      phone: data.phone,
+      name: data.name?.trim(),
+      phone: data.phone?.trim(),
       clientProfile: {
         defaultAddress: defaultAddress || null,
         savedAddresses: addresses,
@@ -240,6 +259,7 @@ const ClientProfileForm = ({
             <input
               type="text"
               {...register('name', { required: 'El nombre es obligatorio' })}
+              placeholder="Ingresa tu nombre"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-white"
             />
             {errors.name && (
@@ -273,12 +293,13 @@ const ClientProfileForm = ({
             <input
               type="tel"
               {...register('phone', {
+                required: 'El teléfono es obligatorio para poder recibir pedidos',
                 pattern: {
                   value: /^\+?\d{9,15}$/,
-                  message: 'Formato de teléfono inválido'
+                  message: 'Formato de teléfono inválido (ej: +5491112345678)'
                 }
               })}
-              placeholder="+549123456789"
+              placeholder="Ej: +54 9 11 1234-5678"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 dark:bg-gray-700 dark:text-white"
             />
             {errors.phone && (
@@ -298,7 +319,7 @@ const ClientProfileForm = ({
       {/* Dirección predeterminada */}
       <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-6">
-          Dirección Predeterminada
+          Dirección de entrega
         </h2>
 
         {defaultAddress ? (
@@ -355,7 +376,7 @@ const ClientProfileForm = ({
           <div className="text-center py-8">
             <div className="text-gray-400 dark:text-gray-500 text-4xl mb-4">📍</div>
             <p className="text-gray-600 dark:text-gray-400 mb-2">
-              No tenés una dirección predeterminada
+              Agregá tu dirección de entrega (calle y número) para poder pedir
             </p>
             {addresses.length > 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -363,10 +384,11 @@ const ClientProfileForm = ({
               </p>
             ) : (
               <button
+                type="button"
                 onClick={handleAddAddress}
                 className="bg-orange-600 text-white px-4 py-2 rounded-md hover:bg-orange-700 transition-colors mt-2"
               >
-                Agregar Dirección
+                Agregar dirección de entrega
               </button>
             )}
           </div>
@@ -505,14 +527,30 @@ const ClientProfileForm = ({
         </form>
       </div>
 
-      <div className="flex justify-end">
-        <button
-          onClick={onCancel}
-          className="px-6 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-        >
-          Volver al perfil
-        </button>
-      </div>
+      {/* Guardar perfil completo (valida nombre, teléfono y dirección predeterminada) */}
+      <form onSubmit={handleSubmit(handleFormSubmit)} className="flex flex-col items-end gap-2">
+        {minimalError && (
+          <p className="text-sm text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg px-4 py-2 w-full">
+            {minimalError}
+          </p>
+        )}
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-6 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+          >
+            Volver al perfil
+          </button>
+          <button
+            type="submit"
+            disabled={isSubmitting}
+            className="px-6 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 font-medium disabled:opacity-50"
+          >
+            Guardar perfil
+          </button>
+        </div>
+      </form>
     </div>
   );
 };

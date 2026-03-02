@@ -1,6 +1,6 @@
 // Página de pedidos para conductores en Holy Tacos con tracking en tiempo real
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -14,6 +14,7 @@ import axios from 'axios';
 const STATUS_EN_PROCESO = ['heading_to_restaurant', 'ready_for_pickup', 'at_restaurant', 'on_the_way', 'delivered'];
 
 const DriverOrders = () => {
+  const navigate = useNavigate();
   const { user, refreshUser } = useAuth();
   const { onOrderAssigned, onOrderReadyForPickup, onOrderCancelled, onOrderReassignedAway, onOrderReassignedToYou, onOrderCompleted } = useSocket();
   const [orders, setOrders] = useState([]);
@@ -32,7 +33,25 @@ const DriverOrders = () => {
   useEffect(() => {
     const un1 = onOrderAssigned?.((payload) => {
       const shortId = payload?.orderId ? String(payload.orderId).slice(-6) : '';
-      toast.success(payload?.message || `Te asignaron un nuevo pedido ${shortId ? `(#${shortId})` : ''}.`);
+      const message = payload?.message || `Te asignaron un nuevo pedido ${shortId ? `#${shortId}` : ''}`;
+      toast.custom(
+        (t) => (
+          <div className="flex items-center gap-3 bg-white shadow-lg rounded-lg px-4 py-3 border border-gray-200">
+            <span className="text-gray-800">{message}</span>
+            <button
+              type="button"
+              onClick={() => {
+                navigate('/driver/orders');
+                toast.dismiss(t.id);
+              }}
+              className="bg-orange-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-orange-700 whitespace-nowrap"
+            >
+              Ir a órdenes
+            </button>
+          </div>
+        ),
+        { duration: 8000 }
+      );
       loadDriverOrders();
     });
     const un2 = onOrderReadyForPickup?.(() => {

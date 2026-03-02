@@ -1,9 +1,12 @@
 // Página Profile para Holy Tacos
 // Muestra el perfil y permite editar desde la misma página (sin /profile/edit)
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
 import ProfileHeader from '../components/Profile/ProfileHeader';
+import ProfileProgressBar, { getProfileProgress } from '../components/Profile/ProfileProgressBar';
 import ClientProfileForm from '../components/Profile/ClientProfileForm';
 import DriverProfileForm from '../components/Profile/DriverProfileForm';
 import LocationSharingToggle from '../components/LocationSharingToggle';
@@ -11,13 +14,53 @@ import ProfilePhotoField from '../components/Profile/ProfilePhotoField';
 import BackButton from '../components/BackButton';
 import axios from 'axios';
 
+// Cliente con perfil incompleto: falta name, phone o defaultAddress (street, number, lat/lng válidos). Coincide con backend isProfileComplete.
+const isClientProfileIncomplete = (profile) => {
+  if (!profile || profile.role !== 'client') return false;
+  if (profile.isProfileComplete === true) return false;
+  const hasName = profile.name?.trim();
+  const hasPhone = profile.phone?.trim();
+  const def = profile.clientProfile?.defaultAddress;
+  const hasStreetNumber = def && def.street?.trim() && def.number?.trim();
+  const coords = def?.location?.coordinates;
+  const hasValidCoords = Array.isArray(coords) && coords.length >= 2 && (Number(coords[0]) !== 0 || Number(coords[1]) !== 0);
+  return !hasName || !hasPhone || !hasStreetNumber || !hasValidCoords;
+};
+
+// Conductor con perfil incompleto: falta teléfono, vehículo (tipo y placa), licencia o documentos
+const isDriverProfileIncomplete = (profile) => {
+  if (!profile || profile.role !== 'driver') return false;
+  const hasPhone = profile.phone?.trim();
+  const v = profile.driverProfile?.vehicle;
+  const hasVehicle = v && v.type && v.plate?.trim();
+  const hasLicense = profile.driverProfile?.licenseNumber?.trim() && profile.driverProfile?.licenseExpiration;
+  const docs = profile.driverProfile?.documents;
+  const hasDocuments = docs?.licenseFront && docs?.licenseBack && docs?.profileVerification;
+  return !hasPhone || !hasVehicle || !hasLicense || !hasDocuments;
+};
+
 const Profile = () => {
-  const { user, isAuthenticated, refreshUser, isAdmin } = useAuth();
+  const { user, refreshUser, isAdmin } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const fromRegister = location.state?.fromRegister === true;
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [editMode, setEditMode] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const prevProgressRef = useRef(null);
+
+  // Toast cuando el perfil pasa a 100% (cliente o conductor)
+  useEffect(() => {
+    if (!profile || (profile.role !== 'client' && profile.role !== 'driver')) return;
+    const current = getProfileProgress(profile);
+    if (prevProgressRef.current !== null && prevProgressRef.current < 100 && current >= 100) {
+      toast.success('¡Perfil completado al 100%!');
+    }
+    prevProgressRef.current = current;
+  }, [profile]);
 
   // Refrescar usuario y cargar perfil cuando haya usuario (solo re-ejecutar cuando cambie el id, no en cada actualización de user)
   useEffect(() => {
@@ -34,12 +77,17 @@ const Profile = () => {
       const response = await axios.get('/api/profile');
 
       if (response.data.success) {
-        setProfile(response.data.data);
+        const data = response.data.data;
+        setProfile(data);
+        // Si llegó desde registro (cliente o conductor), abrir edición para completar perfil
+        if (fromRegister && (data?.role === 'client' || data?.role === 'driver')) {
+          setEditMode(true);
+        }
       } else {
         setError(response.data.message);
       }
-    } catch (error) {
-      console.error('Error al cargar perfil:', error);
+    } catch (err) {
+      console.error('Error al cargar perfil:', err);
       setError('Error al cargar el perfil');
     } finally {
       setLoading(false);
@@ -72,8 +120,19 @@ const Profile = () => {
     try {
       await axios.put('/api/profile', profileData);
       const res = await axios.get('/api/profile');
-      if (res.data.success && res.data.data) setProfile(res.data.data);
-      setEditMode(false);
+      if (res.data.success && res.data.data) {
+        const updated = res.data.data;
+        setProfile(updated);
+        setEditMode(false);
+        if (fromRegister && updated?.role === 'client' && !isClientProfileIncomplete(updated)) {
+          toast.success('Perfil completado. ¡Ahora puedes pedir!');
+          navigate('/', { replace: true, state: {} });
+        }
+        if (fromRegister && updated?.role === 'driver' && !isDriverProfileIncomplete(updated)) {
+          toast.success('Perfil completado. ¡Ahora puedes activarte y recibir pedidos!');
+          navigate('/driver/dashboard', { replace: true, state: {} });
+        }
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -123,14 +182,78 @@ const Profile = () => {
     <Layout>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
         <div className="max-w-4xl mx-auto px-4">
-          {/* Botón volver (no se muestra para admin; navega por Perfil y Dashboard en el header) */}
+          {/* Botón volver: si cliente con perfil incompleto, mostrar modal de confirmación */}
           {!isAdmin() && (
             <div className="mb-4">
-              <BackButton to="/" label="Volver al Inicio" variant="link" />
+              {profile?.role === 'client' && isClientProfileIncomplete(profile) ? (
+                <button
+                  type="button"
+                  onClick={() => setShowLeaveModal(true)}
+                  className="text-orange-600 hover:text-orange-700 font-medium"
+                >
+                  Volver al Inicio
+                </button>
+              ) : profile?.role === 'driver' && isDriverProfileIncomplete(profile) ? (
+                <button
+                  type="button"
+                  onClick={() => setShowLeaveModal(true)}
+                  className="text-orange-600 hover:text-orange-700 font-medium"
+                >
+                  Volver
+                </button>
+              ) : profile?.role === 'driver' ? (
+                <BackButton to="/driver/dashboard" label="Volver al panel" variant="link" />
+              ) : (
+                <BackButton to="/" label="Volver al Inicio" variant="link" />
+              )}
+            </div>
+          )}
+          {/* Guía para cliente: completar perfil para poder hacer pedidos */}
+          {profile?.role === 'client' && (fromRegister || isClientProfileIncomplete(profile)) && (
+            <div className="mb-6 rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800 px-4 py-3 text-orange-800 dark:text-orange-200 text-sm">
+              {fromRegister
+                ? 'Completa tu perfil (nombre, teléfono y dirección de entrega con ubicación en mapa) para empezar a pedir.'
+                : 'Completa estos campos para poder hacer pedidos: nombre, teléfono y dirección de entrega con ubicación en el mapa.'}
+            </div>
+          )}
+          {fromRegister && profile?.role === 'driver' && (
+            <div className="mb-6 rounded-lg border border-orange-200 bg-orange-50 dark:bg-orange-900/20 dark:border-orange-800 px-4 py-3 text-orange-800 dark:text-orange-200 text-sm">
+              Completa tu perfil (teléfono, vehículo, licencia y documentos) para empezar a trabajar como conductor.
+            </div>
+          )}
+          {/* Modal: salir sin completar perfil (cliente o conductor) */}
+          {showLeaveModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-sm w-full p-6">
+                <p className="text-gray-900 dark:text-white font-medium mb-4">
+                  {profile?.role === 'driver'
+                    ? 'Completa tu perfil para usar la app como driver.'
+                    : 'Completa tu perfil para usar la app y poder hacer pedidos.'}
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowLeaveModal(false)}
+                    className="px-4 py-2 bg-gray-200 dark:bg-gray-600 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-500"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowLeaveModal(false);
+                      navigate(profile?.role === 'driver' ? '/driver/dashboard' : '/', { replace: true });
+                    }}
+                    className="px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700"
+                  >
+                    Ir igualmente
+                  </button>
+                </div>
+              </div>
             </div>
           )}
           {/* Header */}
-          <div className="mb-8">
+          <div className="mb-6">
             <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
               Mi Perfil
             </h1>
@@ -138,6 +261,13 @@ const Profile = () => {
               Gestiona tu información personal y preferencias
             </p>
           </div>
+
+          {/* Barra de progreso según completitud del perfil (solo cliente y conductor; oculta al 100%) */}
+          {profile && (profile.role === 'client' || profile.role === 'driver') && getProfileProgress(profile) < 100 && (
+            <div className="mb-6">
+              <ProfileProgressBar profile={profile} />
+            </div>
+          )}
 
           <ProfileHeader
             user={profile}

@@ -7,8 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import Layout from '../components/Layout';
 import BackButton from '../components/BackButton';
-import MapTracker from '../components/MapTracker';
-import MapWithThreeMarkers from '../components/MapWithThreeMarkers';
+import MapComponent from '../components/MapComponent';
 import axios from 'axios';
 
 const OrderTracking = () => {
@@ -682,12 +681,17 @@ const OrderTracking = () => {
                       Aún no hay suficiente información para mostrar el mapa. Esperá a que el pedido esté listo o en camino.
                     </div>
                   ) : (
-                    <MapWithThreeMarkers
+                    <MapComponent
                       restaurantLocation={restaurantLocation}
-                      deliveryLocation={deliveryLocation}
+                      clientLocation={deliveryLocation}
                       driverLocation={driverLocation}
+                      restaurantLabel="Restaurante"
+                      clientLabel="Tu dirección"
+                      driverLabel="Conductor"
                       showRoute
                       showETA
+                      showInfoWindows
+                      containerStyle={{ width: '100%', height: '420px', borderRadius: '0.75rem' }}
                     />
                   )}
                 </div>

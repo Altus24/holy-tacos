@@ -4,7 +4,6 @@
 // "Todos" excluye rechazados; los rechazados solo aparecen en la pestaña Rechazados
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
-import DriverCountsDashboard from './DriverCountsDashboard';
 import DriverTableSkeleton from './DriverTableSkeleton';
 
 const DriverManagement = ({ onStatsUpdate }) => {
@@ -306,9 +305,6 @@ const DriverManagement = ({ onStatsUpdate }) => {
   return (
     <div className="p-6">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">Gestión de Drivers</h2>
-
-      {/* Tarjetas de conteo: Total drivers, Activos, Disponibles ahora */}
-      <DriverCountsDashboard refreshTrigger={refreshTrigger} />
 
       {/* Mensaje de feedback */}
       {message && (

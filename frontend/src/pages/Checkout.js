@@ -1,7 +1,9 @@
 // Página de checkout/pago en Holy Tacos con Stripe Checkout
 // Usa la dirección predeterminada del perfil del cliente; permite elegir otra guardada o editarla
+// Bloquea pedidos si el cliente no tiene perfil completo (name, phone, defaultAddress con lat/lng)
 import React, { useState, useEffect } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import Layout from '../components/Layout';
@@ -12,6 +14,7 @@ import axios from 'axios';
 
 const Checkout = () => {
   const { isAuthenticated, user } = useAuth();
+  const navigate = useNavigate();
   const {
     cartItems,
     getCartTotal,
@@ -147,11 +150,41 @@ const Checkout = () => {
     } catch (error) {
       console.error('Error al crear orden:', error);
       const errorMessage = error.response?.data?.message || 'Error al procesar tu pedido. Inténtalo de nuevo.';
+      if (error.response?.status === 403) {
+        toast.error(errorMessage);
+        navigate('/profile');
+        return;
+      }
       alert(errorMessage);
     } finally {
       setLoading(false);
     }
   };
+
+  // Bloqueo: cliente sin perfil completo (mensaje por si la redirección no ocurre aún)
+  if (!profileLoading && profile?.role === 'client' && profile?.isProfileComplete !== true) {
+    return (
+      <Layout>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4">
+          <div className="max-w-md w-full text-center">
+            <div className="text-6xl mb-4">📋</div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              Perfil incompleto
+            </h2>
+            <p className="text-gray-600 mb-6">
+              Por favor completa tu perfil (nombre, teléfono y dirección de entrega con ubicación en mapa) para continuar y poder hacer pedidos.
+            </p>
+            <Link
+              to="/profile"
+              className="inline-block bg-orange-600 text-white px-6 py-3 rounded-lg hover:bg-orange-700 transition-colors font-medium"
+            >
+              Ir a perfil
+            </Link>
+          </div>
+        </div>
+      </Layout>
+    );
+  }
 
   // Si no está autenticado, mostrar mensaje
   if (!isAuthenticated()) {

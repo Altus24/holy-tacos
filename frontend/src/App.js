@@ -1,26 +1,39 @@
-// Importación de React y componentes necesarios
-import React, { useState, useEffect } from 'react';
+// Router principal: rutas por rol (client/driver/admin), lazy loading, redirección según rol.
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
-import Home from './pages/Home';
-import Login from './pages/Login';
-import Register from './pages/Register';
-import Restaurants from './pages/Restaurants';
-import RestaurantDetail from './pages/RestaurantDetail';
-import Cart from './pages/Cart';
-import Checkout from './pages/Checkout';
-import Orders from './pages/Orders';
-import OrderTracking from './pages/OrderTracking';
-import RateOrder from './pages/RateOrder';
-import OrderSuccess from './pages/OrderSuccess';
-import Profile from './pages/Profile';
-import AdminDashboard from './pages/AdminDashboard';
-import DriverOrders from './pages/DriverOrders';
-import DriverOrderDetail from './pages/DriverOrderDetail';
-import DriverDashboard from './pages/DriverDashboard';
+import PrivateRoute from './components/PrivateRoute';
 
-// Para la ruta "/": conductores van al mapa; el resto ve Home (restaurantes)
+// Carga diferida de páginas para mejor tiempo de carga inicial
+const Home = lazy(() => import('./pages/Home'));
+const Login = lazy(() => import('./pages/Login'));
+const Register = lazy(() => import('./pages/Register'));
+const Restaurants = lazy(() => import('./pages/Restaurants'));
+const RestaurantDetail = lazy(() => import('./pages/RestaurantDetail'));
+const Cart = lazy(() => import('./pages/Cart'));
+const Checkout = lazy(() => import('./pages/Checkout'));
+const Orders = lazy(() => import('./pages/Orders'));
+const OrderTracking = lazy(() => import('./pages/OrderTracking'));
+const RateOrder = lazy(() => import('./pages/RateOrder'));
+const OrderSuccess = lazy(() => import('./pages/OrderSuccess'));
+const Profile = lazy(() => import('./pages/Profile'));
+const AdminDashboard = lazy(() => import('./pages/AdminDashboard'));
+const DriverDashboard = lazy(() => import('./pages/DriverDashboard'));
+const DriverMapPage = lazy(() => import('./pages/driver/DriverMapPage'));
+const DriverOrders = lazy(() => import('./pages/DriverOrders'));
+const DriverOrderDetail = lazy(() => import('./pages/DriverOrderDetail'));
+const DriverStats = lazy(() => import('./pages/driver/Stats'));
+const DriverProfile = lazy(() => import('./pages/driver/Profile'));
+
+// Fallback minimalista mientras carga una ruta lazy
+const PageFallback = () => (
+  <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="animate-spin rounded-full h-10 w-10 border-2 border-orange-500 border-t-transparent" />
+  </div>
+);
+
+// Ruta "/": conductores → mapa; resto → Home
 const HomeOrDriverRedirect = () => {
   const { isAuthenticated, isDriver, loading } = useAuth();
   if (!loading && isAuthenticated() && isDriver()) {
@@ -29,139 +42,51 @@ const HomeOrDriverRedirect = () => {
   return <Home />;
 };
 
-// Componente para rutas protegidas
-const ProtectedRoute = ({ children, requireRole }) => {
-  const { isAuthenticated, hasRole, refreshUser } = useAuth();
-  const [checkingAuth, setCheckingAuth] = useState(true);
-  const [isAuthValid, setIsAuthValid] = useState(false);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      if (isAuthenticated()) {
-        setIsAuthValid(true);
-        setCheckingAuth(false);
-        return;
-      }
-
-      // Intentar refrescar el usuario si no está autenticado
-      const refreshed = await refreshUser();
-      setIsAuthValid(refreshed);
-      setCheckingAuth(false);
-    };
-
-    checkAuth();
-  }, [isAuthenticated, refreshUser]);
-
-  if (checkingAuth) {
-    // Mostrar loading mientras verifica la autenticación
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-orange-600"></div>
-      </div>
-    );
-  }
-
-  if (!isAuthValid) {
-    return <Navigate to="/login" replace />;
-  }
-
-  if (requireRole && !hasRole(requireRole)) {
-    return <Navigate to="/" replace />;
-  }
-
-  return children;
-};
-
-// Componente principal de la aplicación
 function App() {
   return (
-    // Configuración del enrutador de React
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="App">
         <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
-        {/* Definición de rutas de la aplicación */}
-        <Routes>
-          {/* Ruta principal: conductores → mapa; clientes/no logueados → Home (restaurantes) */}
-          <Route path="/" element={<HomeOrDriverRedirect />} />
+        <Suspense fallback={<PageFallback />}>
+          <Routes>
+            {/* Ruta principal: driver → mapa; client/anon → Home */}
+            <Route path="/" element={<HomeOrDriverRedirect />} />
 
-          {/* Rutas de autenticación */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
 
-          {/* Rutas públicas */}
-          <Route path="/restaurants" element={<Restaurants />} />
-          <Route path="/restaurant/:id" element={<RestaurantDetail />} />
+            <Route path="/restaurants" element={<Restaurants />} />
+            <Route path="/restaurant/:id" element={<RestaurantDetail />} />
 
-          {/* Rutas protegidas para usuarios autenticados */}
-          <Route path="/cart" element={
-            <ProtectedRoute>
-              <Cart />
-            </ProtectedRoute>
-          } />
-          <Route path="/checkout" element={
-            <ProtectedRoute>
-              <Checkout />
-            </ProtectedRoute>
-          } />
-          <Route path="/orders" element={
-            <ProtectedRoute>
-              <Orders />
-            </ProtectedRoute>
-          } />
-          <Route path="/orders/:orderId" element={
-            <ProtectedRoute>
-              <OrderTracking />
-            </ProtectedRoute>
-          } />
-          <Route path="/rate/:orderId" element={
-            <ProtectedRoute>
-              <RateOrder />
-            </ProtectedRoute>
-          } />
-          <Route path="/order-success" element={
-            <OrderSuccess />
-          } />
+            {/* Rutas solo cliente: driver que intente acceder → /driver/map */}
+            <Route path="/cart" element={<PrivateRoute requireRole="client"><Cart /></PrivateRoute>} />
+            <Route path="/checkout" element={<PrivateRoute requireRole="client"><Checkout /></PrivateRoute>} />
+            <Route path="/orders" element={<PrivateRoute requireRole="client"><Orders /></PrivateRoute>} />
+            <Route path="/orders/:orderId" element={<PrivateRoute requireRole="client"><OrderTracking /></PrivateRoute>} />
+            <Route path="/rate/:orderId" element={<PrivateRoute requireRole="client"><RateOrder /></PrivateRoute>} />
+            <Route path="/order-success" element={<OrderSuccess />} />
 
-          {/* Rutas de perfil */}
-          <Route path="/profile" element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          } />
-          <Route path="/profile/edit" element={<Navigate to="/profile" replace />} />
+            {/* Perfil: client y driver */}
+            <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+            <Route path="/profile/edit" element={<Navigate to="/profile" replace />} />
 
-          {/* Rutas protegidas para administradores */}
-          <Route path="/admin/dashboard" element={
-            <ProtectedRoute requireRole="admin">
-              <AdminDashboard />
-            </ProtectedRoute>
-          } />
+            <Route path="/admin/dashboard" element={<PrivateRoute requireRole="admin"><AdminDashboard /></PrivateRoute>} />
 
-          {/* Rutas protegidas para conductores (página principal del conductor = mapa) */}
-          <Route path="/driver" element={<Navigate to="/driver/map" replace />} />
-          <Route path="/driver/map" element={
-            <ProtectedRoute requireRole="driver">
-              <DriverDashboard />
-            </ProtectedRoute>
-          } />
-          <Route path="/driver/orders" element={
-            <ProtectedRoute requireRole="driver">
-              <DriverOrders />
-            </ProtectedRoute>
-          } />
-          <Route path="/driver/orders/:orderId" element={
-            <ProtectedRoute requireRole="driver">
-              <DriverOrderDetail />
-            </ProtectedRoute>
-          } />
+            {/* Rutas conductor: /driver → mapa */}
+            <Route path="/driver" element={<Navigate to="/driver/map" replace />} />
+            <Route path="/driver/dashboard" element={<PrivateRoute requireRole="driver"><DriverDashboard /></PrivateRoute>} />
+            <Route path="/driver/map" element={<PrivateRoute requireRole="driver"><DriverMapPage /></PrivateRoute>} />
+            <Route path="/driver/orders" element={<PrivateRoute requireRole="driver"><DriverOrders /></PrivateRoute>} />
+            <Route path="/driver/orders/:orderId" element={<PrivateRoute requireRole="driver"><DriverOrderDetail /></PrivateRoute>} />
+            <Route path="/driver/stats" element={<PrivateRoute requireRole="driver"><DriverStats /></PrivateRoute>} />
+            <Route path="/driver/profile" element={<PrivateRoute requireRole="driver"><DriverProfile /></PrivateRoute>} />
 
-          {/* Ruta por defecto - redirige al home */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </div>
     </Router>
   );
 }
 
-// Exportación del componente App
 export default App;
