@@ -34,18 +34,27 @@ const app = express();
 // Crear servidor HTTP para Socket.io
 const server = http.createServer(app);
 
+// Normalizar URL del frontend y aceptar con/sin trailing slash (el navegador envía sin barra)
+const frontendOrigin = (process.env.FRONTEND_URL || 'http://localhost:3000').replace(/\/+$/, '');
+const allowedOrigins = [frontendOrigin, frontendOrigin + '/'];
+
 // Configurar Socket.io con CORS
 const io = socketIo(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   }
 });
 
-// Middlewares básicos
+// Middlewares básicos - permitir origin con o sin trailing slash
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true); // p. ej. Postman
+    const normalized = origin.replace(/\/+$/, '');
+    if (normalized === frontendOrigin) return cb(null, true);
+    cb(null, false);
+  },
   credentials: true
 }));
 // Rate limit general (después de CORS, antes de rutas)

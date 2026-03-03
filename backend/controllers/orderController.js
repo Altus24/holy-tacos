@@ -140,7 +140,10 @@ const assignDriver = async (req, res) => {
         orderId: updated._id,
         status: newStatus,
         message: `Te reasignaron el pedido #${shortId}. Revisá los detalles.`,
-        restaurantName: updated.restaurantId?.name || null
+        restaurantName: updated.restaurantId?.name || null,
+        // Coordenadas desde el pedido (se guardan al crear la orden)
+        restaurantLocation: updated.restaurantLocation || null,
+        deliveryLocation: updated.deliveryLocation || null
       });
     } else {
       // Asignación inicial: misma lógica que antes
@@ -148,7 +151,10 @@ const assignDriver = async (req, res) => {
         orderId: updated._id,
         status: newStatus,
         message: 'Te asignaron un nuevo pedido. Espera a que el restaurante lo prepare.',
-        restaurantName: updated.restaurantId?.name || null
+        restaurantName: updated.restaurantId?.name || null,
+        // Coordenadas desde el pedido (se guardan al crear la orden)
+        restaurantLocation: updated.restaurantLocation || null,
+        deliveryLocation: updated.deliveryLocation || null
       });
     }
 

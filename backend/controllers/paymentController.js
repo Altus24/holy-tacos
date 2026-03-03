@@ -1,13 +1,16 @@
 // Controlador de pagos con Stripe para Holy Tacos
 // Maneja sesiones de checkout y webhooks de Stripe
+const mongoose = require('mongoose');
 const Order = require('../models/Order');
 
 // Función para obtener instancia de Stripe (lazy loading)
+// La clave se recorta por si .env tiene espacios o saltos de línea
 const getStripe = () => {
-  if (!process.env.STRIPE_SECRET_KEY) {
-    throw new Error('STRIPE_SECRET_KEY no está configurada en las variables de entorno');
+  const key = process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.trim();
+  if (!key || key === 'sk_test_...' || key.startsWith('sk_test_***')) {
+    throw new Error('STRIPE_SECRET_KEY no está configurada o es un placeholder. Usa una clave real desde https://dashboard.stripe.com/apikeys');
   }
-  return require('stripe')(process.env.STRIPE_SECRET_KEY);
+  return require('stripe')(key);
 };
 
 // Crear sesión de checkout con Stripe
@@ -17,11 +20,43 @@ const createCheckoutSession = async (req, res) => {
 
     console.log('💳 Creando sesión de checkout para orden:', orderId, 'monto:', amount);
 
+    // Stripe no configurado o clave placeholder → 503
+    const stripeKey = process.env.STRIPE_SECRET_KEY && process.env.STRIPE_SECRET_KEY.trim();
+    if (!stripeKey || stripeKey === 'sk_test_...' || stripeKey.startsWith('sk_test_***')) {
+      console.error('STRIPE_SECRET_KEY no configurada o es placeholder. Obtén una clave en https://dashboard.stripe.com/apikeys');
+      return res.status(503).json({
+        success: false,
+        message: 'El pago no está configurado. El restaurante debe añadir una clave de Stripe válida.'
+      });
+    }
+
     // Verificar que el usuario esté autenticado
     if (!req.user || !req.user._id) {
       return res.status(401).json({
         success: false,
         message: 'Usuario no autenticado'
+      });
+    }
+
+    if (!orderId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Falta el ID del pedido'
+      });
+    }
+
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de pedido inválido'
+      });
+    }
+
+    const amountCents = typeof amount === 'number' ? Math.round(amount) : parseInt(amount, 10);
+    if (isNaN(amountCents) || amountCents < 50) {
+      return res.status(400).json({
+        success: false,
+        message: 'El monto debe ser al menos $0.50 MXN'
       });
     }
 
@@ -38,8 +73,9 @@ const createCheckoutSession = async (req, res) => {
       });
     }
 
-    // Verificar que la orden pertenece al usuario autenticado
-    if (req.user && order.userId._id.toString() !== req.user._id.toString()) {
+    // Verificar que la orden pertenece al usuario (userId puede ser objeto poblado o ObjectId)
+    const orderUserId = (order.userId && (order.userId._id || order.userId)).toString();
+    if (orderUserId !== req.user._id.toString()) {
       return res.status(403).json({
         success: false,
         message: 'No tienes permisos para esta orden'
@@ -67,7 +103,7 @@ const createCheckoutSession = async (req, res) => {
               description: `Entrega a: ${order.deliveryAddress}`,
               images: ['https://via.placeholder.com/300x200?text=Holy+Tacos'],
             },
-            unit_amount: amount,
+            unit_amount: amountCents,
           },
           quantity: 1,
         },
@@ -109,10 +145,14 @@ const createCheckoutSession = async (req, res) => {
 
   } catch (error) {
     console.error('Error creando sesión de checkout:', error);
+    const isDev = process.env.NODE_ENV === 'development';
+    const message = isDev && error.message
+      ? `Error al crear la sesión de pago: ${error.message}`
+      : 'Error al crear la sesión de pago. Inténtalo de nuevo.';
     res.status(500).json({
       success: false,
-      message: 'Error al crear la sesión de pago',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+      message,
+      ...(isDev && error.message && { error: error.message })
     });
   }
 };

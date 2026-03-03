@@ -59,7 +59,13 @@ const userSchema = new mongoose.Schema({
     default: Date.now
   },
 
-  // Perfil específico para clientes
+  // Solo clientes: true cuando tienen name, phone y defaultAddress (street, number, lat/lng) completos para poder hacer pedidos
+  isProfileComplete: {
+    type: Boolean,
+    default: false
+  },
+
+  // Perfil específico para clientes (no se asigna en registro; name, phone y clientProfile quedan vacíos)
   clientProfile: {
     // Dirección predeterminada de entrega
     defaultAddress: {
@@ -105,7 +111,7 @@ const userSchema = new mongoose.Schema({
     }]
   },
 
-  // Perfil específico para conductores
+  // Perfil específico para conductores (no se asigna en registro; queda vacío para completar en /profile)
   driverProfile: {
     // Información del vehículo
     vehicle: {

@@ -103,6 +103,14 @@ router.post('/', authenticateToken, async (req, res) => {
     const { restaurantId, items, deliveryAddress: bodyAddress, notes, deliveryLat, deliveryLng } = req.body;
     const userId = req.user._id;
 
+    // Clientes deben tener perfil completo para poder crear pedidos
+    if (req.user.role === 'client' && !req.user.isProfileComplete) {
+      return res.status(403).json({
+        success: false,
+        message: 'Completa tu perfil antes de hacer pedidos'
+      });
+    }
+
     // Validar datos requeridos (restaurantId e items son obligatorios)
     if (!userId || !restaurantId || !items) {
       return res.status(400).json({

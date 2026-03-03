@@ -16,12 +16,12 @@ const generarToken = (userId, email, role) => {
   );
 };
 
-// POST /api/auth/register - Registrar nuevo usuario
+// POST /api/auth/register - Registrar nuevo usuario. Perfil vacío (name, phone, clientProfile/driverProfile sin setear).
+// Cliente y conductor son redirigidos a /profile para completar datos.
 router.post('/register', registerValidation, handleValidation, async (req, res) => {
   try {
     const { email, password, role } = req.body;
 
-    // Verificar si el usuario ya existe
     const usuarioExistente = await User.findOne({ email: email.toLowerCase() });
     if (usuarioExistente) {
       return res.status(409).json({
@@ -30,15 +30,14 @@ router.post('/register', registerValidation, handleValidation, async (req, res) 
       });
     }
 
-    // Hashear la contraseña
     const saltRounds = 10;
     const hashedPassword = await bcrypt.hash(password, saltRounds);
 
-    // Crear el usuario con rol por defecto 'client' si no se especifica
+    // Solo email, password y rol. name, phone, clientProfile (cliente) y driverProfile (conductor) quedan vacíos para completar en /profile
     const nuevoUsuario = new User({
       email: email.toLowerCase(),
       password: hashedPassword,
-      role: role || 'client' // Por defecto es cliente
+      role: role || 'client'
     });
 
     const usuarioGuardado = await nuevoUsuario.save();
@@ -50,12 +49,13 @@ router.post('/register', registerValidation, handleValidation, async (req, res) 
       usuarioGuardado.role
     );
 
-    // Usuario autenticado exitosamente
+    // Usuario autenticado exitosamente (isProfileComplete en false hasta que complete perfil)
     const usuarioRespuesta = {
       _id: usuarioGuardado._id,
       email: usuarioGuardado.email,
       role: usuarioGuardado.role,
-      createdAt: usuarioGuardado.createdAt
+      createdAt: usuarioGuardado.createdAt,
+      isProfileComplete: usuarioGuardado.isProfileComplete === true
     };
 
     res.status(201).json({

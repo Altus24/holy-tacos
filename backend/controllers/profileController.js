@@ -3,6 +3,20 @@
 const User = require('../models/User');
 const { getFileUrl } = require('../middleware/upload');
 
+/**
+ * Calcula si un cliente tiene perfil completo para poder hacer pedidos.
+ * Requiere: name, phone, defaultAddress con street y number (las coordenadas en mapa son opcionales).
+ */
+function computeClientProfileComplete(user) {
+  if (!user || user.role !== 'client') return false;
+  const hasName = user.name && String(user.name).trim();
+  const hasPhone = user.phone && String(user.phone).trim();
+  const def = user.clientProfile?.defaultAddress;
+  const hasStreet = def && def.street && String(def.street).trim();
+  const hasNumber = def && def.number && String(def.number).trim();
+  return !!(hasName && hasPhone && hasStreet && hasNumber);
+}
+
 // Obtener perfil completo del usuario autenticado
 const getProfile = async (req, res) => {
   try {
@@ -15,13 +29,23 @@ const getProfile = async (req, res) => {
       });
     }
 
-    const user = await User.findById(req.user._id).populate(populateOptions);
+    let user = await User.findById(req.user._id).populate(populateOptions);
 
     if (!user) {
       return res.status(404).json({
         success: false,
         message: 'Usuario no encontrado'
       });
+    }
+
+    // Sincronizar isProfileComplete con los datos reales del perfil (clientes)
+    // Así si el perfil está completo pero el flag estaba en false, se actualiza al cargar /profile o checkout
+    if (user.role === 'client') {
+      const computed = computeClientProfileComplete(user);
+      if (user.isProfileComplete !== computed) {
+        await User.findByIdAndUpdate(user._id, { $set: { isProfileComplete: computed } });
+        user.isProfileComplete = computed;
+      }
     }
 
     res.status(200).json({
@@ -70,6 +94,14 @@ const updateProfile = async (req, res) => {
       if (profileData.clientProfile) {
         updateData.clientProfile = profileData.clientProfile;
       }
+      // Calcular isProfileComplete: name, phone, defaultAddress (street, number, lat/lng)
+      const currentUser = await User.findById(req.user._id).lean();
+      const merged = {
+        name: updateData.name !== undefined ? updateData.name : currentUser.name,
+        phone: updateData.phone !== undefined ? updateData.phone : currentUser.phone,
+        clientProfile: updateData.clientProfile || currentUser.clientProfile
+      };
+      updateData.isProfileComplete = computeClientProfileComplete(merged);
     } else if (req.user.role === 'driver') {
       // Para conductores: actualizar SOLO los campos editables por el driver.
       // NUNCA reemplazar driverProfile entero: se perderían verificationStatus, verificationHistory, etc. (seteados por admin).

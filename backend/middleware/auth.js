@@ -19,8 +19,8 @@ const authenticateToken = async (req, res, next) => {
     // Verificar token JWT
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Buscar usuario en la base de datos
-    const usuario = await User.findById(decoded.userId);
+    // Buscar usuario en la base de datos (incluir isProfileComplete para validar pedidos de clientes)
+    const usuario = await User.findById(decoded.userId).select('email role isProfileComplete');
     if (!usuario) {
       return res.status(401).json({
         success: false,
@@ -32,7 +32,8 @@ const authenticateToken = async (req, res, next) => {
     req.user = {
       _id: usuario._id,
       email: usuario.email,
-      role: usuario.role
+      role: usuario.role,
+      isProfileComplete: usuario.isProfileComplete === true
     };
 
     next();
