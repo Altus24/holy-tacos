@@ -12,16 +12,17 @@ import NavigationPanel from './NavigationPanel';
 
 const GOOGLE_MAP_LIBRARIES = ['places', 'marker'];
 
+// Si mapId está presente, NO usar styles (Google no permite ambos)
+const mapId = process.env.REACT_APP_GOOGLE_MAPS_MAP_ID || undefined;
 const MAP_OPTIONS = {
   zoomControl: true,
   streetViewControl: false,
   mapTypeControl: false,
   fullscreenControl: true,
-  styles: [
-    { featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }
-  ],
-  // Para AdvancedMarkerElement Google exige un mapId válido. Se inyecta vía env del frontend.
-  mapId: process.env.REACT_APP_GOOGLE_MAPS_MAP_ID || undefined
+  ...(mapId ? {} : {
+    styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
+  }),
+  ...(mapId ? { mapId } : {})
 };
 
 // Centro por defecto (Mendoza) cuando no hay ubicación ni restaurantes
@@ -445,62 +446,69 @@ const DriverMap = ({
       return;
     }
 
+    const map = mapRef.current;
+    if (!map) return;
+
     const AdvancedMarkerElement = window.google.maps.marker.AdvancedMarkerElement;
 
-    // Marcador del driver
-    if (driverLocation?.lat != null && driverLocation?.lng != null) {
-      const position = { lat: driverLocation.lat, lng: driverLocation.lng };
-      if (!driverMarkerRef.current) {
-        driverMarkerRef.current = new AdvancedMarkerElement({
-          map: mapRef.current,
-          position,
-          title: 'Tu posición'
-        });
-      } else {
-        driverMarkerRef.current.position = position;
-        driverMarkerRef.current.title = 'Tu posición';
+    try {
+      // Marcador del driver
+      if (driverLocation?.lat != null && driverLocation?.lng != null) {
+        const position = { lat: driverLocation.lat, lng: driverLocation.lng };
+        if (!driverMarkerRef.current) {
+          driverMarkerRef.current = new AdvancedMarkerElement({
+            map,
+            position,
+            title: 'Tu posición'
+          });
+        } else {
+          driverMarkerRef.current.position = position;
+          driverMarkerRef.current.title = 'Tu posición';
+        }
+      } else if (driverMarkerRef.current) {
+        driverMarkerRef.current.map = null;
+        driverMarkerRef.current = null;
       }
-    } else if (driverMarkerRef.current) {
-      driverMarkerRef.current.map = null;
-      driverMarkerRef.current = null;
-    }
 
-    // Marcadores de restaurantes
-    if (restaurantMarkersRef.current.length) {
-      restaurantMarkersRef.current.forEach(m => {
-        if (m) m.map = null;
-      });
-      restaurantMarkersRef.current = [];
-    }
-    if (restaurantMarkers.length) {
-      restaurantMarkersRef.current = restaurantMarkers.map(r => {
-        const pos = { lat: r.lat, lng: r.lng };
-        const marker = new AdvancedMarkerElement({
-          map: mapRef.current,
-          position: pos,
-          title: r.name || 'Restaurante'
+      // Marcadores de restaurantes
+      if (restaurantMarkersRef.current.length) {
+        restaurantMarkersRef.current.forEach(m => {
+          if (m) m.map = null;
         });
-        marker.addListener?.('dblclick', () => handleRestaurantDblClick(r));
-        return marker;
-      });
-    }
-
-    // Marcador del cliente (dirección de entrega)
-    if (deliveryCoords?.lat != null && deliveryCoords?.lng != null) {
-      const position = { lat: deliveryCoords.lat, lng: deliveryCoords.lng };
-      if (!clientMarkerRef.current) {
-        clientMarkerRef.current = new AdvancedMarkerElement({
-          map: mapRef.current,
-          position,
-          title: 'Dirección de entrega'
-        });
-      } else {
-        clientMarkerRef.current.position = position;
-        clientMarkerRef.current.title = 'Dirección de entrega';
+        restaurantMarkersRef.current = [];
       }
-    } else if (clientMarkerRef.current) {
-      clientMarkerRef.current.map = null;
-      clientMarkerRef.current = null;
+      if (restaurantMarkers.length) {
+        restaurantMarkersRef.current = restaurantMarkers.map(r => {
+          const pos = { lat: r.lat, lng: r.lng };
+          const marker = new AdvancedMarkerElement({
+            map,
+            position: pos,
+            title: r.name || 'Restaurante'
+          });
+          marker.addListener?.('dblclick', () => handleRestaurantDblClick(r));
+          return marker;
+        });
+      }
+
+      // Marcador del cliente (dirección de entrega)
+      if (deliveryCoords?.lat != null && deliveryCoords?.lng != null) {
+        const position = { lat: deliveryCoords.lat, lng: deliveryCoords.lng };
+        if (!clientMarkerRef.current) {
+          clientMarkerRef.current = new AdvancedMarkerElement({
+            map,
+            position,
+            title: 'Dirección de entrega'
+          });
+        } else {
+          clientMarkerRef.current.position = position;
+          clientMarkerRef.current.title = 'Dirección de entrega';
+        }
+      } else if (clientMarkerRef.current) {
+        clientMarkerRef.current.map = null;
+        clientMarkerRef.current = null;
+      }
+    } catch (err) {
+      console.warn('Error creando marcadores del mapa (puede ser por carga incompleta):', err);
     }
   }, [
     scriptLoaded,

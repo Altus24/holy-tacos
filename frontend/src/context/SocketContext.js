@@ -3,7 +3,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import io from 'socket.io-client';
 import { useAuth } from './AuthContext';
-import API_BASE_URL from '../config/api';
+import API_BASE_URL, { getApiUrl } from '../config/api';
 
 // Crear el contexto
 const SocketContext = createContext();
@@ -57,7 +57,7 @@ export const SocketProvider = ({ children }) => {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 3000);
 
-        const response = await fetch(`${API_BASE_URL}/api/estado`, {
+        const response = await fetch(getApiUrl('api/estado'), {
           method: 'HEAD',
           signal: controller.signal
         });
