@@ -10,19 +10,16 @@ import {
 import { useNavigationSteps } from '../../hooks/useNavigationSteps';
 import NavigationPanel from './NavigationPanel';
 
-const GOOGLE_MAP_LIBRARIES = ['places', 'marker'];
+// Usar solo 'places'; Marker clásico no requiere 'marker' ni mapId
+const GOOGLE_MAP_LIBRARIES = ['places'];
 
-// Si mapId está presente, NO usar styles (Google no permite ambos)
-const mapId = process.env.REACT_APP_GOOGLE_MAPS_MAP_ID || undefined;
+// Mapa estándar con estilos (sin mapId para evitar problemas de config)
 const MAP_OPTIONS = {
   zoomControl: true,
   streetViewControl: false,
   mapTypeControl: false,
   fullscreenControl: true,
-  ...(mapId ? {} : {
-    styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
-  }),
-  ...(mapId ? { mapId } : {})
+  styles: [{ featureType: 'poi', elementType: 'labels', stylers: [{ visibility: 'off' }] }]
 };
 
 // Centro por defecto (Mendoza) cuando no hay ubicación ni restaurantes
@@ -64,6 +61,7 @@ const DriverMap = ({
   const [scriptLoaded, setScriptLoaded] = useState(() =>
     typeof window !== 'undefined' && !!window.google?.maps
   );
+  const [mapLoadError, setMapLoadError] = useState(null);
   const [center, setCenter] = useState(DEFAULT_CENTER);
   const [driverToRestaurantDirections, setDriverToRestaurantDirections] = useState(null);
   const [restaurantToClientDirections, setRestaurantToClientDirections] = useState(null);
@@ -83,6 +81,16 @@ const DriverMap = ({
   );
   const mapRef = useRef(null);
   const directionsDebounceRef = useRef(null);
+  const setMapLoadErrorRef = useRef(setMapLoadError);
+  setMapLoadErrorRef.current = setMapLoadError;
+
+  // Google Maps llama a gm_authFailure cuando hay error de referrer/API key
+  useEffect(() => {
+    window.gm_authFailure = () => {
+      setMapLoadErrorRef.current?.('RefererNotAllowedMapError: agregá tu dominio en Google Cloud Console.');
+    };
+    return () => { delete window.gm_authFailure; };
+  }, []);
   const trafficLayerRef = useRef(null);
   const lastSpokenStepRef = useRef(-1);
   const driverMarkerRef = useRef(null);
@@ -420,72 +428,65 @@ const DriverMap = ({
   useEffect(() => {
     return () => {
       if (driverMarkerRef.current) {
-        driverMarkerRef.current.map = null;
+        driverMarkerRef.current.setMap(null);
         driverMarkerRef.current = null;
       }
       if (clientMarkerRef.current) {
-        clientMarkerRef.current.map = null;
+        clientMarkerRef.current.setMap(null);
         clientMarkerRef.current = null;
       }
-      if (restaurantMarkersRef.current.length) {
-        restaurantMarkersRef.current.forEach(m => {
-          if (m) m.map = null;
-        });
-        restaurantMarkersRef.current = [];
-      }
+      restaurantMarkersRef.current.forEach(m => { if (m) m.setMap(null); });
+      restaurantMarkersRef.current = [];
     };
   }, []);
 
-  // Crear/actualizar marcadores usando AdvancedMarkerElement (Google Maps JS API moderno)
+  // Crear/actualizar marcadores usando Marker clásico (no requiere mapId ni librería 'marker')
   useEffect(() => {
-    if (
-      !scriptLoaded ||
-      !mapRef.current ||
-      !window.google?.maps?.marker?.AdvancedMarkerElement
-    ) {
+    if (!scriptLoaded || !mapRef.current || !window.google?.maps?.Marker) return;
+    const map = mapRef.current;
+
+    // Validar que el mapa esté correctamente inicializado antes de crear marcadores
+    try {
+      const div = map.getDiv?.();
+      if (!div) return;
+    } catch {
       return;
     }
 
-    const map = mapRef.current;
-    if (!map) return;
-
-    const AdvancedMarkerElement = window.google.maps.marker.AdvancedMarkerElement;
-
     try {
+      const Marker = window.google.maps.Marker;
+
       // Marcador del driver
       if (driverLocation?.lat != null && driverLocation?.lng != null) {
         const position = { lat: driverLocation.lat, lng: driverLocation.lng };
         if (!driverMarkerRef.current) {
-          driverMarkerRef.current = new AdvancedMarkerElement({
+          driverMarkerRef.current = new Marker({
             map,
             position,
             title: 'Tu posición'
           });
         } else {
-          driverMarkerRef.current.position = position;
-          driverMarkerRef.current.title = 'Tu posición';
+          driverMarkerRef.current.setPosition(position);
+          driverMarkerRef.current.setTitle('Tu posición');
         }
       } else if (driverMarkerRef.current) {
-        driverMarkerRef.current.map = null;
+        driverMarkerRef.current.setMap(null);
         driverMarkerRef.current = null;
       }
 
       // Marcadores de restaurantes
       if (restaurantMarkersRef.current.length) {
-        restaurantMarkersRef.current.forEach(m => {
-          if (m) m.map = null;
-        });
+        restaurantMarkersRef.current.forEach(m => { if (m) m.setMap(null); });
         restaurantMarkersRef.current = [];
       }
       if (restaurantMarkers.length) {
         restaurantMarkersRef.current = restaurantMarkers.map(r => {
-          const pos = { lat: r.lat, lng: r.lng };
-          const marker = new AdvancedMarkerElement({
+          const marker = new Marker({
             map,
-            position: pos,
+            position: { lat: r.lat, lng: r.lng },
             title: r.name || 'Restaurante'
           });
-          marker.addListener?.('dblclick', () => handleRestaurantDblClick(r));
+          marker.addListener('dblclick', () => handleRestaurantDblClick(r));
           return marker;
         });
       }
@@ -494,17 +495,17 @@ const DriverMap = ({
       if (deliveryCoords?.lat != null && deliveryCoords?.lng != null) {
         const position = { lat: deliveryCoords.lat, lng: deliveryCoords.lng };
         if (!clientMarkerRef.current) {
-          clientMarkerRef.current = new AdvancedMarkerElement({
+          clientMarkerRef.current = new Marker({
             map,
             position,
             title: 'Dirección de entrega'
           });
         } else {
-          clientMarkerRef.current.position = position;
-          clientMarkerRef.current.title = 'Dirección de entrega';
+          clientMarkerRef.current.setPosition(position);
+          clientMarkerRef.current.setTitle('Dirección de entrega');
         }
       } else if (clientMarkerRef.current) {
-        clientMarkerRef.current.map = null;
+        clientMarkerRef.current.setMap(null);
         clientMarkerRef.current = null;
       }
     } catch (err) {
@@ -984,13 +985,44 @@ const DriverMap = ({
     </>
   );
 
+  // Mensaje cuando Google Maps falla (p. ej. RefererNotAllowedMapError)
+  if (mapLoadError) {
+    const isRefererError = String(mapLoadError).includes('RefererNotAllowedMapError') ||
+      String(mapLoadError).includes('referer') ||
+      String(mapLoadError).includes('authorized');
+    return (
+      <div className={`bg-amber-50 border-2 border-amber-300 rounded-lg p-6 text-center ${className}`}>
+        <p className="font-medium text-amber-900 mb-2">No se pudo cargar el mapa</p>
+        {isRefererError ? (
+          <>
+            <p className="text-amber-800 text-sm mb-4">
+              Tu dominio no está autorizado en la API key de Google Maps. En la consola de Google Cloud, 
+              agregá <code className="bg-amber-100 px-1 rounded">https://holy-tacos.vercel.app/*</code> a los HTTP referrers permitidos.
+            </p>
+            <a
+              href="https://console.cloud.google.com/apis/credentials"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 hover:underline"
+            >
+              Abrir Google Cloud Console →
+            </a>
+          </>
+        ) : (
+          <p className="text-amber-800 text-sm">{String(mapLoadError)}</p>
+        )}
+      </div>
+    );
+  }
+
   // Siempre usar LoadScript; solo mostrar el mapa cuando onLoad haya corrido (google.maps.Map disponible)
   return (
     <div className={`relative ${className}`}>
       <LoadScript
         googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_API_KEY}
         libraries={GOOGLE_MAP_LIBRARIES}
-        onLoad={() => setScriptLoaded(true)}
+        onLoad={() => { setScriptLoaded(true); setMapLoadError(null); }}
+        onError={(e) => setMapLoadError(e?.message || e || 'Error al cargar Google Maps')}
       >
         {!scriptLoaded ? loadingPlaceholder : mapContent}
       </LoadScript>
