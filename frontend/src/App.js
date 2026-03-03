@@ -4,6 +4,9 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { useAuth } from './context/AuthContext';
 import PrivateRoute from './components/PrivateRoute';
+import OfflineBanner from './components/OfflineBanner';
+import PwaInstallBanner from './components/PwaInstallBanner';
+import PwaUpdateBanner from './components/PwaUpdateBanner';
 
 // Carga diferida de páginas para mejor tiempo de carga inicial
 const Home = lazy(() => import('./pages/Home'));
@@ -46,6 +49,10 @@ function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="App">
+        {/* Banners PWA: siempre presentes independientemente de la ruta */}
+        <OfflineBanner />
+        <PwaInstallBanner />
+        <PwaUpdateBanner />
         <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
         <Suspense fallback={<PageFallback />}>
           <Routes>
