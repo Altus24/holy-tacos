@@ -1,6 +1,6 @@
 // Página de seguimiento de pedidos para clientes en Holy Tacos
 // Muestra mapa en tiempo real con ubicación del driver y ruta estimada
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -32,12 +32,38 @@ const OrderTracking = () => {
   const [isMapModalOpen, setIsMapModalOpen] = useState(false);
   const [mapAutoOpened, setMapAutoOpened] = useState(false);
 
+  const loadOrderDetails = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`/api/orders/${orderId}`);
+
+      if (response.data.success) {
+        const orderData = response.data.data;
+
+        // Verificar que el usuario sea el dueño del pedido
+        if (orderData.userId._id !== user._id && user.role !== 'admin') {
+          setError('No tienes permisos para ver este pedido');
+          return;
+        }
+
+        setOrder(orderData);
+      } else {
+        setError('Pedido no encontrado');
+      }
+    } catch (error) {
+      console.error('Error al cargar pedido:', error);
+      setError('Error al cargar los detalles del pedido');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId, user._id, user.role]);
+
   // Cargar detalles del pedido
   useEffect(() => {
     if (orderId && isAuthenticated()) {
       loadOrderDetails();
     }
-  }, [orderId, isAuthenticated]);
+  }, [orderId, isAuthenticated, loadOrderDetails]);
 
   // Unirse a la sala del pedido cuando se cargue
   useEffect(() => {
@@ -115,42 +141,6 @@ const OrderTracking = () => {
     }
   }, [order, mapAutoOpened]);
 
-  const loadOrderDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`/api/orders/${orderId}`);
-
-      if (response.data.success) {
-        const orderData = response.data.data;
-
-        // Verificar que el usuario sea el dueño del pedido
-        if (orderData.userId._id !== user._id && user.role !== 'admin') {
-          setError('No tienes permisos para ver este pedido');
-          return;
-        }
-
-        setOrder(orderData);
-
-        // Si el pedido tiene coordenadas guardadas, usarlas
-        if (orderData.restaurantLocation) {
-          // Las coordenadas ya están disponibles
-        }
-
-        // Si el pedido está siendo entregado, inicializar ubicación del driver
-        if (orderData.status === 'picked_up' && orderData.driverId) {
-          // La ubicación se actualizará en tiempo real vía socket
-        }
-
-      } else {
-        setError('Pedido no encontrado');
-      }
-    } catch (error) {
-      console.error('Error al cargar pedido:', error);
-      setError('Error al cargar los detalles del pedido');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // Textos y colores del flujo: pending → assigned → heading_to_restaurant → ready_for_pickup → on_the_way → delivered → completed
   const getStatusText = (status) => {

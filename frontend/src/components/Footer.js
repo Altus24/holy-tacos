@@ -15,13 +15,13 @@ const Footer = () => {
               Conectamos los mejores restaurantes con los amantes de la comida.
             </p>
             <div className="flex space-x-4">
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://facebook.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                 📘 Facebook
               </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://instagram.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                 📷 Instagram
               </a>
-              <a href="#" className="text-gray-400 hover:text-white transition-colors">
+              <a href="https://twitter.com" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
                 🐦 Twitter
               </a>
             </div>
@@ -54,19 +54,19 @@ const Footer = () => {
             <h6 className="font-semibold mb-4">Soporte</h6>
             <ul className="space-y-2 text-gray-400">
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/help" className="hover:text-white transition-colors">
                   Centro de Ayuda
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/contact" className="hover:text-white transition-colors">
                   Contacto
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/report" className="hover:text-white transition-colors">
                   Reportar Problema
-                </a>
+                </Link>
               </li>
             </ul>
           </div>
@@ -76,19 +76,19 @@ const Footer = () => {
             <h6 className="font-semibold mb-4">Legal</h6>
             <ul className="space-y-2 text-gray-400">
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/terms" className="hover:text-white transition-colors">
                   Términos y Condiciones
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/privacy" className="hover:text-white transition-colors">
                   Política de Privacidad
-                </a>
+                </Link>
               </li>
               <li>
-                <a href="#" className="hover:text-white transition-colors">
+                <Link to="/cookies" className="hover:text-white transition-colors">
                   Política de Cookies
-                </a>
+                </Link>
               </li>
             </ul>
           </div>

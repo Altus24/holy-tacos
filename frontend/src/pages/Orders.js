@@ -1,5 +1,5 @@
 // Página de pedidos del usuario en Holy Tacos con tracking en tiempo real
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuth } from '../context/AuthContext';
@@ -10,7 +10,7 @@ import CancelOrderModal from '../components/CancelOrderModal';
 import axios from 'axios';
 
 const Orders = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { isAuthenticated } = useAuth();
   const { onOrderDelivered, onOrderStatusChanged } = useSocket();
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -24,17 +24,20 @@ const Orders = () => {
   const [cancelMessage, setCancelMessage] = useState(null); // { type: 'success' | 'error', text: '' }
   const [expandedCompletedOrderId, setExpandedCompletedOrderId] = useState(null); // dropdown pedidos completados
   const [openActionsDropdownId, setOpenActionsDropdownId] = useState(null); // dropdown acciones (pago/soporte/cancelar)
+  const ordersRef = useRef(orders);
+  ordersRef.current = orders;
 
   // Función para obtener pedidos del usuario
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     try {
+      setLoading(true);
       const response = await axios.get('/api/orders');
       if (response.data.success) {
         const newOrders = response.data.data;
 
         // Verificar si hay cambios en los pedidos para mostrar notificaciones
-        if (orders.length > 0 && newOrders.length > 0) {
-          checkForStatusChanges(orders, newOrders);
+        if (ordersRef.current.length > 0 && newOrders.length > 0) {
+          checkForStatusChanges(ordersRef.current, newOrders);
         }
 
         setOrders(newOrders);
@@ -44,15 +47,18 @@ const Orders = () => {
     } catch (error) {
       console.error('Error al obtener pedidos:', error);
       setError('Error al cargar pedidos. Inténtalo nuevamente.');
+    } finally {
+      setLoading(false);
     }
-  };
+  // checkForStatusChanges es estable en el closure
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Función para verificar cambios de estado y mostrar notificaciones
   const checkForStatusChanges = (oldOrders, newOrders) => {
     newOrders.forEach(newOrder => {
       const oldOrder = oldOrders.find(o => o._id === newOrder._id);
       if (oldOrder && oldOrder.status !== newOrder.status) {
-        // Mostrar notificación de cambio de estado
         showStatusChangeNotification(newOrder, oldOrder.status, newOrder.status);
       }
     });
@@ -224,9 +230,10 @@ const Orders = () => {
   useEffect(() => {
     if (isAuthenticated()) {
       fetchOrders();
+    } else {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [isAuthenticated]);
+  }, [isAuthenticated, fetchOrders]);
 
   // Sincronizar lista solo cuando hay cambios reales (eventos en tiempo real)
   useEffect(() => {
@@ -241,7 +248,7 @@ const Orders = () => {
       if (unDelivered) unDelivered();
       if (unStatusChanged) unStatusChanged();
     };
-  }, [onOrderDelivered, onOrderStatusChanged]);
+  }, [onOrderDelivered, onOrderStatusChanged, fetchOrders]);
 
   return (
     <Layout>

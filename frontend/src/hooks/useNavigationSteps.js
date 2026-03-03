@@ -67,7 +67,7 @@ export function useNavigationSteps(routeToRestaurant, driverLocation, navigation
 
   const steps = useMemo(
     () => getStepsFromRoute(routeToRestaurant),
-    [routeToRestaurant?.fullResult, routeToRestaurant?.selectedRouteIndex]
+    [routeToRestaurant]
   );
 
   useEffect(() => {

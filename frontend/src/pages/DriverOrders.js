@@ -24,10 +24,24 @@ const DriverOrders = () => {
   const [activeTab, setActiveTab] = useState('assigned'); // 'assigned' | 'in_progress' | 'completed'
   const [expandedOrderId, setExpandedOrderId] = useState(null); // para dropdown de completados
 
+  const loadDriverOrders = useCallback(async () => {
+    try {
+      const response = await axios.get('/api/orders');
+      if (response.data.success) {
+        setOrders(response.data.data);
+        setLastUpdate(new Date());
+      }
+    } catch (error) {
+      console.error('Error al cargar pedidos:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     refreshUser?.();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    loadDriverOrders();
+  }, [refreshUser, loadDriverOrders]);
 
   // Notificaciones en tiempo real: asignación, pedido listo para recoger, pedido cancelado y reasignaciones
   useEffect(() => {
@@ -86,50 +100,21 @@ const DriverOrders = () => {
       setLastUpdate(new Date());
     });
     return () => { if (un1) un1(); if (un2) un2(); if (un3) un3(); if (un4) un4(); if (un5) un5(); if (un6) un6(); };
-  }, [onOrderAssigned, onOrderReadyForPickup, onOrderCancelled, onOrderReassignedAway, onOrderReassignedToYou, onOrderCompleted]);
+  }, [onOrderAssigned, onOrderReadyForPickup, onOrderCancelled, onOrderReassignedAway, onOrderReassignedToYou, onOrderCompleted, loadDriverOrders, navigate]);
 
+  // Cargar pedidos al montar (ya llamado en useEffect anterior)
   const handleOrderStatusUpdate = useCallback((orderId, newStatus) => {
     setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, status: newStatus } : o)));
     setLastUpdate(new Date());
   }, []);
 
-  const loadDriverOrders = async () => {
-    try {
-      const response = await axios.get('/api/orders');
-      if (response.data.success) {
-        setOrders(response.data.data);
-        setLastUpdate(new Date());
-      }
-    } catch (error) {
-      console.error('Error al cargar pedidos:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Función para verificar cambios y mostrar notificaciones
-  const checkForNewOrders = (newOrders) => {
-    const newAssignedOrders = newOrders.filter(order =>
-      order.driverId && order.driverId._id === user._id &&
-      !orders.some(oldOrder => oldOrder._id === order._id)
-    );
-
-    if (newAssignedOrders.length > 0) {
-      alert(`¡Tienes ${newAssignedOrders.length} nuevo(s) pedido(s) asignado(s)!`);
-    }
-  };
-
-  // Cargar pedidos al montar; las actualizaciones llegan por socket (sin polling)
-  useEffect(() => {
-    loadDriverOrders();
-  }, []);
 
   // Verificar nuevos pedidos cuando se actualice la lista
   useEffect(() => {
     if (orders.length > 0 && lastUpdate) {
       // Aquí podríamos comparar con el estado anterior para detectar nuevos pedidos
     }
-  }, [orders]);
+  }, [orders, lastUpdate]);
 
   // Actualizar estado del pedido
   const updateOrderStatus = async (orderId, newStatus) => {
@@ -158,10 +143,8 @@ const DriverOrders = () => {
     }
   };
 
-  // Obtener pedidos por estado
-  const getOrdersByStatus = (status) => {
-    return orders.filter(order => order.status === status);
-  };
+  // Obtener pedidos por estado (usado en listToShow implícitamente)
+  const getOrdersByStatus = (status) => orders.filter(o => o.status === status);
 
   const getDriverLocation = (order) => {
     if (order.status === 'on_the_way') {
@@ -185,9 +168,9 @@ const DriverOrders = () => {
     return null;
   };
 
-  const assignedOrders = orders.filter(o => o.status === 'assigned');
+  const assignedOrders = getOrdersByStatus('assigned');
   const inProgressOrders = orders.filter(o => STATUS_EN_PROCESO.includes(o.status));
-  const completedOrders = orders.filter(o => o.status === 'completed');
+  const completedOrders = getOrdersByStatus('completed');
   const listToShow = activeTab === 'assigned' ? assignedOrders : activeTab === 'in_progress' ? inProgressOrders : completedOrders;
 
   const getStatusText = (status) => {

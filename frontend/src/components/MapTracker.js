@@ -5,8 +5,7 @@ import {
   GoogleMap,
   LoadScript,
   Marker,
-  DirectionsRenderer,
-  DirectionsService
+  DirectionsRenderer
 } from '@react-google-maps/api';
 
 // Estilos del mapa
@@ -40,7 +39,7 @@ const MapTracker = ({
   showRoute = true,
   showETA = true
 }) => {
-  const [map, setMap] = useState(null);
+  const [, setMap] = useState(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [directionsResponse, setDirectionsResponse] = useState(null);
   const [restaurantCoords, setRestaurantCoords] = useState(null);

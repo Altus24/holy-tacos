@@ -25,10 +25,11 @@ const WorkingAreasPicker = ({ value = [], onChange, placeholder = 'Buscar ciudad
     const place = autocompleteRef.current.getPlace();
     const name = place?.formatted_address || place?.name || '';
     if (!name.trim()) return;
-    const next = list.includes(name) ? list : [...list, name];
+    const currentList = Array.isArray(value) ? value : [];
+    const next = currentList.includes(name) ? currentList : [...currentList, name];
     onChange(next);
     setInputValue('');
-  }, [list, onChange]);
+  }, [value, onChange]);
 
   const removeZone = (index) => {
     const next = list.filter((_, i) => i !== index);

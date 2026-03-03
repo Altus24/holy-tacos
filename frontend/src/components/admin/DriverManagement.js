@@ -14,7 +14,6 @@ const DriverManagement = ({ onStatsUpdate }) => {
   const [activeTab, setActiveTab] = useState('pending');
   // Conteos desde API (para tarjetas superiores y badges de pestañas)
   const [countsData, setCountsData] = useState({ total: 0, active: 0, availableNow: 0, pending: 0, approved: 0, rejected: 0 });
-  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Estados de modales
   const [verifyModal, setVerifyModal] = useState({ show: false, driver: null, action: '' }); // action: 'approve' | 'reject' | 'revoke'
@@ -28,7 +27,7 @@ const DriverManagement = ({ onStatsUpdate }) => {
   const loadCounts = useCallback(async () => {
     try {
       const response = await axios.get('/api/admin/drivers/counts');
-      setCountsData(response.data?.data || countsData);
+      setCountsData(prev => response.data?.data || prev);
     } catch (error) {
       console.error('Error cargando conteos de drivers:', error);
     }
@@ -70,7 +69,6 @@ const DriverManagement = ({ onStatsUpdate }) => {
 
   // Refrescar lista y conteos después de cualquier acción
   const refreshAfterAction = useCallback(() => {
-    setRefreshTrigger(t => t + 1);
     loadCounts();
     loadDrivers(activeTab);
     if (onStatsUpdate) onStatsUpdate();
@@ -204,7 +202,6 @@ const DriverManagement = ({ onStatsUpdate }) => {
   // Botones de acción según estado de verificación
   const renderActions = (driver) => {
     const vStatus = getVerificationStatus(driver);
-    const isApproved = vStatus === 'approved';
     const isActive = driver.driverProfile?.isActive !== false;
 
     return (

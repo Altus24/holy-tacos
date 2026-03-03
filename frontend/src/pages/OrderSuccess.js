@@ -1,5 +1,5 @@
 // Página de éxito después del pago con Stripe
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Layout from '../components/Layout';
@@ -7,7 +7,7 @@ import BackButton from '../components/BackButton';
 import axios from 'axios';
 
 const OrderSuccess = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const [orderDetails, setOrderDetails] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -15,21 +15,7 @@ const OrderSuccess = () => {
 
   const sessionId = searchParams.get('session_id');
 
-  useEffect(() => {
-    console.log('🚀 OrderSuccess: Página cargada');
-    console.log('📋 Session ID:', sessionId);
-    console.log('👤 Usuario autenticado:', !!user);
-
-    if (sessionId) {
-      verifyPayment();
-    } else {
-      // Para testing: usar endpoint de prueba si no hay sessionId
-      console.log('🧪 Usando modo de prueba (sin sessionId)');
-      testPaymentSuccess();
-    }
-  }, [sessionId, user]);
-
-  const testPaymentSuccess = async () => {
+  const testPaymentSuccess = useCallback(async () => {
     try {
       const response = await axios.get('/api/payment/test-success');
       if (response.data.success) {
@@ -41,9 +27,9 @@ const OrderSuccess = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const verifyPayment = async () => {
+  const verifyPayment = useCallback(async () => {
     try {
       if (!sessionId) {
         throw new Error('No se recibió el ID de sesión de Stripe');
@@ -82,7 +68,15 @@ const OrderSuccess = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [sessionId]);
+
+  useEffect(() => {
+    if (sessionId) {
+      verifyPayment();
+    } else {
+      testPaymentSuccess();
+    }
+  }, [sessionId, verifyPayment, testPaymentSuccess]);
 
   if (loading) {
     return (

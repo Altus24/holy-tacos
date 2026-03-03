@@ -11,12 +11,9 @@ import axios from 'axios';
 // Estados que consideramos "orden activa" para mostrar en el mapa (cliente + ruta)
 const ACTIVE_ORDER_STATUSES = ['assigned', 'heading_to_restaurant', 'ready_for_pickup', 'at_restaurant', 'on_the_way'];
 
-// Centro por defecto para cargar restaurantes al ingresar (antes de tener ubicación del driver)
-const DEFAULT_MAP_CENTER = { lat: -32.8895, lng: -68.8458 };
-
 const DriverDashboard = () => {
   const navigate = useNavigate();
-  const { user } = useAuth();
+  useAuth(); // Requerido para rutas protegidas
   const { onOrderAssigned, onOrderCancelled, onOrderReassignedAway } = useSocket();
 
   const [driverLocation, setDriverLocation] = useState(null);
@@ -28,7 +25,7 @@ const DriverDashboard = () => {
   /** Si true, el mapa muestra solo restaurantes cercanos; si false, todos los activos */
   const [showOnlyNearby, setShowOnlyNearby] = useState(false);
   const [orders, setOrders] = useState([]);
-  const [ordersLoading, setOrdersLoading] = useState(true);
+  const [, setOrdersLoading] = useState(true);
   const watchIdRef = useRef(null);
   const nearbyDebounceRef = useRef(null);
 
@@ -165,6 +162,7 @@ const DriverDashboard = () => {
     return () => {
       if (nearbyDebounceRef.current) clearTimeout(nearbyDebounceRef.current);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [driverLocation?.lat, driverLocation?.lng]);
 
   // Lista que ve el mapa: todos los activos o solo cercanos según el filtro

@@ -1,6 +1,6 @@
 // Página de detalle de pedido para conductores en Holy Tacos
 // Permite seguimiento GPS, actualización de estado y comunicación en tiempo real
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
@@ -28,12 +28,40 @@ const DriverOrderDetail = () => {
   const watchIdRef = useRef(null);
   const locationIntervalRef = useRef(null);
 
+  const loadOrderDetails = useCallback(async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`/api/orders/${orderId}`);
+
+      if (response.data.success) {
+        const orderData = response.data.data;
+
+        // Permitir ver si: pedido pendiente sin conductor (para aceptar) o asignado a este driver
+        const driverId = orderData.driverId?._id || orderData.driverId;
+        if (driverId && driverId.toString() !== user._id.toString()) {
+          setError('No tenés permisos para ver este pedido');
+          setLoading(false);
+          return;
+        }
+
+        setOrder(orderData);
+      } else {
+        setError('Pedido no encontrado');
+      }
+    } catch (error) {
+      console.error('Error al cargar pedido:', error);
+      setError('Error al cargar los detalles del pedido');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId, user._id]);
+
   // Cargar detalles del pedido
   useEffect(() => {
     if (orderId) {
       loadOrderDetails();
     }
-  }, [orderId]);
+  }, [orderId, loadOrderDetails]);
 
   // Configurar seguimiento GPS cuando el pedido esté en proceso de entrega
   useEffect(() => {
@@ -43,6 +71,8 @@ const DriverOrderDetail = () => {
       startLocationTracking();
     }
     return () => { stopLocationTracking(); };
+    // startLocationTracking y stopLocationTracking son funciones definidas en el componente
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [order, user._id]);
 
   useEffect(() => {
@@ -89,35 +119,7 @@ const DriverOrderDetail = () => {
       }
     });
     return () => { if (cleanup) cleanup(); };
-  }, [orderId, onOrderReadyForPickup]);
-
-  const loadOrderDetails = async () => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`/api/orders/${orderId}`);
-
-      if (response.data.success) {
-        const orderData = response.data.data;
-
-        // Permitir ver si: pedido pendiente sin conductor (para aceptar) o asignado a este driver
-        const driverId = orderData.driverId?._id || orderData.driverId;
-        if (driverId && driverId.toString() !== user._id.toString()) {
-          setError('No tenés permisos para ver este pedido');
-          setLoading(false);
-          return;
-        }
-
-        setOrder(orderData);
-      } else {
-        setError('Pedido no encontrado');
-      }
-    } catch (error) {
-      console.error('Error al cargar pedido:', error);
-      setError('Error al cargar los detalles del pedido');
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [orderId, onOrderReadyForPickup, order]);
 
   // Función para iniciar seguimiento de ubicación
   const startLocationTracking = () => {

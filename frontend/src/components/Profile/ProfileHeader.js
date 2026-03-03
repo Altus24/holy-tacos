@@ -13,7 +13,7 @@ const ProfileHeader = ({
   isEditing = false
 }) => {
   const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
+  const [pictureError, setUploadError] = useState(null);
 
   const handlePictureUpload = async (file) => {
     if (!file) return;
@@ -87,6 +87,9 @@ const ProfileHeader = ({
             </div>
           )}
 
+          {pictureError && (
+            <p className="absolute -bottom-6 left-0 right-0 text-xs text-red-600 dark:text-red-400">{pictureError}</p>
+          )}
           {uploading && (
             <div className="absolute inset-0 bg-black bg-opacity-50 rounded-full flex items-center justify-center">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>

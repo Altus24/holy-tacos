@@ -3,7 +3,7 @@
  * Pins: verde = driver, rojo = restaurante, azul = cliente. Ruta azul con tráfico, ETA visible, zoom auto.
  * Opcional: info windows con nombre/dirección.
  */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   GoogleMap,
   LoadScript,
@@ -55,14 +55,17 @@ const MapComponent = ({
   const [loadingRoute, setLoadingRoute] = useState(true);
   const [activeInfo, setActiveInfo] = useState(null);
 
-  const points = [restaurantLocation, clientLocation, driverLocation].filter(Boolean);
+  const points = useMemo(
+    () => [restaurantLocation, clientLocation, driverLocation].filter(Boolean),
+    [restaurantLocation, clientLocation, driverLocation]
+  );
 
   useEffect(() => {
     if (points.length === 0) return;
     const avgLat = points.reduce((s, p) => s + p.lat, 0) / points.length;
     const avgLng = points.reduce((s, p) => s + p.lng, 0) / points.length;
     setCenter({ lat: avgLat, lng: avgLng });
-  }, [points.length, restaurantLocation?.lat, restaurantLocation?.lng, clientLocation?.lat, clientLocation?.lng, driverLocation?.lat, driverLocation?.lng]);
+  }, [points]);
 
   const calculateDirections = useCallback(() => {
     if (!driverLocation || !clientLocation || typeof window === 'undefined' || !window.google?.maps) return;

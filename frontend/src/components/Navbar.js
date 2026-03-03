@@ -50,7 +50,7 @@ const Navbar = () => {
     return () => {
       if (pendingPoll.current) clearInterval(pendingPoll.current);
     };
-  }, [fetchPendingOrders]);
+  }, [fetchPendingOrders, isDriver]);
 
   // Toggle de disponibilidad del driver
   const handleToggleAvailability = async () => {

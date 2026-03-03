@@ -32,8 +32,8 @@ export const CartProvider = ({ children }) => {
   // Estado del carrito: inicializar desde localStorage para que al recargar no se pierda
   const [cartItems, setCartItems] = useState(loadCartFromStorage);
 
-  // Estado de loading para operaciones del carrito
-  const [loading, setLoading] = useState(false);
+  // Estado de loading para operaciones del carrito (disponible para futuras mejoras)
+  const [loading] = useState(false);
 
   // Estado para el mini-cart (panel lateral/dropdown rápido)
   const [isMiniCartOpen, setIsMiniCartOpen] = useState(false);

@@ -33,7 +33,7 @@ const DriverProfileForm = ({
   onPictureUpdate
 }) => {
   const [uploadingDocuments, setUploadingDocuments] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
+  const [docUploadError, setUploadError] = useState(null);
   const [localAvailability, setLocalAvailability] = useState(user?.driverProfile?.isAvailable || false);
   const [savingSection, setSavingSection] = useState(null);
   // Mensaje de error al intentar guardar perfil sin datos mínimos
@@ -65,13 +65,11 @@ const DriverProfileForm = ({
     getDocumentsWithAbsoluteUrls(user?.driverProfile?.documents)
   );
 
-  // Debug inicial
+  // Debug inicial: cargar URLs de documentos al montar
   useEffect(() => {
-    console.log('DriverProfileForm montado con documentos:', user?.driverProfile?.documents);
     const initialUrls = getDocumentsWithAbsoluteUrls(user?.driverProfile?.documents);
-    console.log('URLs iniciales:', initialUrls);
     setDocumentUrls(initialUrls);
-  }, []); // Solo al montar
+  }, [user?.driverProfile?.documents]);
 
   // Actualizar URLs cuando cambian los documentos del usuario
   useEffect(() => {
@@ -96,7 +94,6 @@ const DriverProfileForm = ({
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-    setValue,
     watch
   } = useForm({
     defaultValues: {
@@ -706,6 +703,9 @@ const DriverProfileForm = ({
               />
             </div>
 
+            {docUploadError && (
+              <p className="text-sm text-red-600 dark:text-red-400 mt-2">{docUploadError}</p>
+            )}
             {uploadingDocuments && (
               <div className="text-center mt-4">
                 <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-orange-600 mx-auto"></div>

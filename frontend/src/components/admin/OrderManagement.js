@@ -38,9 +38,27 @@ const OrderManagement = ({ onStatsUpdate }) => {
   // Conductor elegido en el dropdown por pedido (solo se asigna al confirmar con el botón)
   const [selectedDriverForOrder, setSelectedDriverForOrder] = useState({}); // { orderId: driverId }
 
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const ordersUrl = '/api/orders';
+      const [ordersRes, usersRes] = await Promise.all([
+        axios.get(ordersUrl),
+        axios.get('/api/users')
+      ]);
+      setOrders(ordersRes.data.data || []);
+      setDrivers(usersRes.data.data?.filter(user => user.role === 'driver') || []);
+      setLastUpdate(new Date());
+    } catch (error) {
+      console.error('Error cargando datos:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    loadData(activeTab);
-  }, [activeTab]);
+    loadData();
+  }, [activeTab, loadData]);
 
   // Notificaciones en tiempo real para admin: refetch y toasts
   useEffect(() => {
@@ -77,26 +95,7 @@ const OrderManagement = ({ onStatsUpdate }) => {
       if (un4) un4();
       if (un5) un5();
     };
-  }, [onNewOrderCreated, onDriverHeadingToRestaurant, onOrderStatusUpdateAdmin, onOrderOnTheWay, onOrderCompleted, onStatsUpdate]);
-
-  const loadData = async (tab = activeTab) => {
-    try {
-      setLoading(true);
-      // Órdenes pagadas: GET /api/orders (admin ya filtra por paymentStatus: 'paid')
-      const ordersUrl = '/api/orders';
-      const [ordersRes, usersRes] = await Promise.all([
-        axios.get(ordersUrl),
-        axios.get('/api/users')
-      ]);
-      setOrders(ordersRes.data.data || []);
-      setDrivers(usersRes.data.data?.filter(user => user.role === 'driver') || []);
-      setLastUpdate(new Date());
-    } catch (error) {
-      console.error('Error cargando datos:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [onNewOrderCreated, onDriverHeadingToRestaurant, onOrderStatusUpdateAdmin, onOrderOnTheWay, onOrderCompleted, onStatsUpdate, loadData]);
 
   const assignDriver = async (orderId, driverId) => {
     try {

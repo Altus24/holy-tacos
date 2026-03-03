@@ -91,14 +91,20 @@ const DriverMap = ({
   // No marcar scriptLoaded desde window.google: el mapa debe montarse siempre dentro LoadScript tras onLoad
 
   // Coordenadas del cliente (orden activa)
-  const deliveryCoords = activeOrder?.deliveryLocation?.lat != null
-    ? { lat: activeOrder.deliveryLocation.lat, lng: activeOrder.deliveryLocation.lng }
-    : null;
-  const orderRestaurantCoords = activeOrder?.restaurantLocation
-    ? { lat: activeOrder.restaurantLocation.lat, lng: activeOrder.restaurantLocation.lng }
-    : (activeOrder?.restaurantId?.location?.coordinates?.length >= 2
-        ? { lat: activeOrder.restaurantId.location.coordinates[1], lng: activeOrder.restaurantId.location.coordinates[0] }
-        : null);
+  const deliveryCoords = useMemo(() => {
+    if (activeOrder?.deliveryLocation?.lat == null) return null;
+    return { lat: activeOrder.deliveryLocation.lat, lng: activeOrder.deliveryLocation.lng };
+  }, [activeOrder?.deliveryLocation?.lat, activeOrder?.deliveryLocation?.lng]);
+  const orderRestaurantCoords = useMemo(() => {
+    if (activeOrder?.restaurantLocation) {
+      return { lat: activeOrder.restaurantLocation.lat, lng: activeOrder.restaurantLocation.lng };
+    }
+    if (activeOrder?.restaurantId?.location?.coordinates?.length >= 2) {
+      return { lat: activeOrder.restaurantId.location.coordinates[1], lng: activeOrder.restaurantId.location.coordinates[0] };
+    }
+    return null;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOrder?.restaurantLocation?.lat, activeOrder?.restaurantLocation?.lng, activeOrder?.restaurantId?.location?.coordinates]);
 
   // Marcadores de restaurantes a mostrar (con lat/lng desde location.coordinates o ya normalizado)
   const restaurantMarkers = restaurantsToShow
@@ -148,6 +154,7 @@ const DriverMap = ({
       const avgLng = points.reduce((s, p) => s + p.lng, 0) / points.length;
       setCenter({ lat: avgLat, lng: avgLng });
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     driverLocation?.lat,
     driverLocation?.lng,
@@ -278,6 +285,7 @@ const DriverMap = ({
     return () => {
       if (directionsDebounceRef.current) clearTimeout(directionsDebounceRef.current);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     scriptLoaded,
     activeOrder?._id,
@@ -291,127 +299,10 @@ const DriverMap = ({
     calculateRestaurantToClient
   ]);
 
-  const onMapLoad = useCallback((map) => {
-    mapRef.current = map;
-    // Capa de tráfico en tiempo real (rojo/amarillo/verde en vías)
-    if (window.google?.maps?.TrafficLayer) {
-      const layer = new window.google.maps.TrafficLayer();
-      layer.setMap(map);
-      trafficLayerRef.current = layer;
-    }
-    // Ajustar vista si ya hay datos
-    const pts = [
-      ...restaurantMarkers.map(r => ({ lat: r.lat, lng: r.lng })),
-      ...(driverLocation ? [driverLocation] : [])
-    ];
-    if (pts.length > 0) applyFitBounds(map, pts, 80);
-  }, [restaurantMarkers.length, driverLocation]);
-
-  // Limpiar capa de tráfico al desmontar
-  useEffect(() => {
-    return () => {
-      if (trafficLayerRef.current?.setMap) trafficLayerRef.current.setMap(null);
-    };
-  }, []);
-
-  // Limpiar marcadores al desmontar
-  useEffect(() => {
-    return () => {
-      if (driverMarkerRef.current) {
-        driverMarkerRef.current.map = null;
-        driverMarkerRef.current = null;
-      }
-      if (clientMarkerRef.current) {
-        clientMarkerRef.current.map = null;
-        clientMarkerRef.current = null;
-      }
-      if (restaurantMarkersRef.current.length) {
-        restaurantMarkersRef.current.forEach(m => {
-          if (m) m.map = null;
-        });
-        restaurantMarkersRef.current = [];
-      }
-    };
-  }, []);
-
-  // Crear/actualizar marcadores usando AdvancedMarkerElement (Google Maps JS API moderno)
-  useEffect(() => {
-    if (
-      !scriptLoaded ||
-      !mapRef.current ||
-      !window.google?.maps?.marker?.AdvancedMarkerElement
-    ) {
-      return;
-    }
-
-    const AdvancedMarkerElement = window.google.maps.marker.AdvancedMarkerElement;
-
-    // Marcador del driver
-    if (driverLocation?.lat != null && driverLocation?.lng != null) {
-      const position = { lat: driverLocation.lat, lng: driverLocation.lng };
-      if (!driverMarkerRef.current) {
-        driverMarkerRef.current = new AdvancedMarkerElement({
-          map: mapRef.current,
-          position,
-          title: 'Tu posición'
-        });
-      } else {
-        driverMarkerRef.current.position = position;
-        driverMarkerRef.current.title = 'Tu posición';
-      }
-    } else if (driverMarkerRef.current) {
-      driverMarkerRef.current.map = null;
-      driverMarkerRef.current = null;
-    }
-
-    // Marcadores de restaurantes
-    if (restaurantMarkersRef.current.length) {
-      restaurantMarkersRef.current.forEach(m => {
-        if (m) m.map = null;
-      });
-      restaurantMarkersRef.current = [];
-    }
-    if (restaurantMarkers.length) {
-      restaurantMarkersRef.current = restaurantMarkers.map(r => {
-        const pos = { lat: r.lat, lng: r.lng };
-        return new AdvancedMarkerElement({
-          map: mapRef.current,
-          position: pos,
-          title: r.name || 'Restaurante'
-        });
-      });
-    }
-
-    // Marcador del cliente (dirección de entrega)
-    if (deliveryCoords?.lat != null && deliveryCoords?.lng != null) {
-      const position = { lat: deliveryCoords.lat, lng: deliveryCoords.lng };
-      if (!clientMarkerRef.current) {
-        clientMarkerRef.current = new AdvancedMarkerElement({
-          map: mapRef.current,
-          position,
-          title: 'Dirección de entrega'
-        });
-      } else {
-        clientMarkerRef.current.position = position;
-        clientMarkerRef.current.title = 'Dirección de entrega';
-      }
-    } else if (clientMarkerRef.current) {
-      clientMarkerRef.current.map = null;
-      clientMarkerRef.current = null;
-    }
-  }, [
-    scriptLoaded,
-    driverLocation?.lat,
-    driverLocation?.lng,
-    restaurantMarkers,
-    deliveryCoords?.lat,
-    deliveryCoords?.lng
-  ]);
-
   /**
    * Doble clic en pin de restaurante: calcular ruta con tráfico y alternativas.
    * Usa drivingOptions (departureTime, trafficModel) y provideRouteAlternatives.
-   * Muestra toasts si hay tráfico pesado o si se elige ruta alternativa automátic.
+   * Muestra toasts si hay tráfico pesado o si se elige ruta alternativa automáticamente.
    */
   const handleRestaurantDblClick = useCallback((restaurant) => {
     if (!driverLocation || !window.google?.maps) return;
@@ -500,6 +391,127 @@ const DriverMap = ({
     });
   }, [driverLocation]);
 
+  const onMapLoad = useCallback((map) => {
+    mapRef.current = map;
+    // Capa de tráfico en tiempo real (rojo/amarillo/verde en vías)
+    if (window.google?.maps?.TrafficLayer) {
+      const layer = new window.google.maps.TrafficLayer();
+      layer.setMap(map);
+      trafficLayerRef.current = layer;
+    }
+    // Ajustar vista si ya hay datos
+    const pts = [
+      ...restaurantMarkers.map(r => ({ lat: r.lat, lng: r.lng })),
+      ...(driverLocation ? [driverLocation] : [])
+    ];
+    if (pts.length > 0) applyFitBounds(map, pts, 80);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [restaurantMarkers.length, driverLocation]);
+
+  // Limpiar capa de tráfico al desmontar
+  useEffect(() => {
+    return () => {
+      if (trafficLayerRef.current?.setMap) trafficLayerRef.current.setMap(null);
+    };
+  }, []);
+
+  // Limpiar marcadores al desmontar
+  useEffect(() => {
+    return () => {
+      if (driverMarkerRef.current) {
+        driverMarkerRef.current.map = null;
+        driverMarkerRef.current = null;
+      }
+      if (clientMarkerRef.current) {
+        clientMarkerRef.current.map = null;
+        clientMarkerRef.current = null;
+      }
+      if (restaurantMarkersRef.current.length) {
+        restaurantMarkersRef.current.forEach(m => {
+          if (m) m.map = null;
+        });
+        restaurantMarkersRef.current = [];
+      }
+    };
+  }, []);
+
+  // Crear/actualizar marcadores usando AdvancedMarkerElement (Google Maps JS API moderno)
+  useEffect(() => {
+    if (
+      !scriptLoaded ||
+      !mapRef.current ||
+      !window.google?.maps?.marker?.AdvancedMarkerElement
+    ) {
+      return;
+    }
+
+    const AdvancedMarkerElement = window.google.maps.marker.AdvancedMarkerElement;
+
+    // Marcador del driver
+    if (driverLocation?.lat != null && driverLocation?.lng != null) {
+      const position = { lat: driverLocation.lat, lng: driverLocation.lng };
+      if (!driverMarkerRef.current) {
+        driverMarkerRef.current = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position,
+          title: 'Tu posición'
+        });
+      } else {
+        driverMarkerRef.current.position = position;
+        driverMarkerRef.current.title = 'Tu posición';
+      }
+    } else if (driverMarkerRef.current) {
+      driverMarkerRef.current.map = null;
+      driverMarkerRef.current = null;
+    }
+
+    // Marcadores de restaurantes
+    if (restaurantMarkersRef.current.length) {
+      restaurantMarkersRef.current.forEach(m => {
+        if (m) m.map = null;
+      });
+      restaurantMarkersRef.current = [];
+    }
+    if (restaurantMarkers.length) {
+      restaurantMarkersRef.current = restaurantMarkers.map(r => {
+        const pos = { lat: r.lat, lng: r.lng };
+        const marker = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position: pos,
+          title: r.name || 'Restaurante'
+        });
+        marker.addListener?.('dblclick', () => handleRestaurantDblClick(r));
+        return marker;
+      });
+    }
+
+    // Marcador del cliente (dirección de entrega)
+    if (deliveryCoords?.lat != null && deliveryCoords?.lng != null) {
+      const position = { lat: deliveryCoords.lat, lng: deliveryCoords.lng };
+      if (!clientMarkerRef.current) {
+        clientMarkerRef.current = new AdvancedMarkerElement({
+          map: mapRef.current,
+          position,
+          title: 'Dirección de entrega'
+        });
+      } else {
+        clientMarkerRef.current.position = position;
+        clientMarkerRef.current.title = 'Dirección de entrega';
+      }
+    } else if (clientMarkerRef.current) {
+      clientMarkerRef.current.map = null;
+      clientMarkerRef.current = null;
+    }
+  }, [
+    scriptLoaded,
+    driverLocation?.lat,
+    driverLocation?.lng,
+    restaurantMarkers,
+    deliveryCoords?.lat,
+    deliveryCoords?.lng,
+    handleRestaurantDblClick
+  ]);
+
   /** Objeto directions con solo la ruta seleccionada (para DirectionsRenderer) */
   const routeToRestaurantDirections = useMemo(() => {
     if (!routeToRestaurant?.fullResult?.routes?.length) return null;
@@ -533,6 +545,7 @@ const DriverMap = ({
     setCurrentStepIndex(0);
     lastSpokenStepRef.current = -1;
     toast.success('Navegación iniciada. Seguí las instrucciones en pantalla.');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeToRestaurant?.destination, driverLocation]);
 
   /**
@@ -610,6 +623,7 @@ const DriverMap = ({
       lastSpokenStepRef.current = -1;
       toast.success('Navegación iniciada. Seguí las instrucciones en pantalla.');
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeOrder, driverLocation, orderRestaurantCoords]);
 
   /** Abrir navegación en Google Maps (como Uber/PedidosYa). En Android usa intent para que aparezca "Iniciar". */
@@ -701,6 +715,7 @@ const DriverMap = ({
       lastSpokenStepRef.current = -1;
       toast.success('Ruta recalculada');
     });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [driverLocation, routeToRestaurant?.destination]);
 
   /** En modo navegación, centrar mapa en el conductor al actualizar ubicación */
@@ -708,6 +723,7 @@ const DriverMap = ({
     if (!navigationMode || !driverLocation || !mapRef.current) return;
     mapRef.current.panTo(driverLocation);
     mapRef.current.setZoom(17);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigationMode, driverLocation?.lat, driverLocation?.lng]);
 
   const handleCenterMe = useCallback(() => {

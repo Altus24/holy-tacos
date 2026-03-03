@@ -13,7 +13,7 @@ import AddressSelector, { formatAddressLine, getLatLngFromAddress } from '../com
 import axios from 'axios';
 
 const Checkout = () => {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const {
     cartItems,
