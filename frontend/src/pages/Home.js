@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import RestaurantCard from '../components/RestaurantCard';
 import Layout from '../components/Layout';
+import API_BASE_URL from '../config/api';
 
 const Home = () => {
   // Estado para los restaurantes
@@ -128,7 +129,7 @@ const Home = () => {
                 </div>
                 <p className="text-red-600 font-medium">{error}</p>
                 <p className="text-gray-600 mt-2">
-                  Verifica que el servidor backend esté ejecutándose en http://localhost:5000
+                  Verifica que el backend esté accesible en {API_BASE_URL}
                 </p>
               </div>
             )}

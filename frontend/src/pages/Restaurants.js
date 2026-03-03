@@ -4,6 +4,7 @@ import axios from 'axios';
 import RestaurantCard from '../components/RestaurantCard';
 import Layout from '../components/Layout';
 import BackButton from '../components/BackButton';
+import API_BASE_URL from '../config/api';
 
 const Restaurants = () => {
   // Estado para los restaurantes
@@ -184,7 +185,7 @@ const Restaurants = () => {
               </div>
               <p className="text-red-600 font-medium">{error}</p>
               <p className="text-gray-600 mt-2">
-                Verifica que el servidor backend esté ejecutándose en http://localhost:5000
+                Verifica que el backend esté accesible en {API_BASE_URL}
               </p>
             </div>
           )}
