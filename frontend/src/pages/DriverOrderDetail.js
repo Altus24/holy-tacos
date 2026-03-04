@@ -2,6 +2,8 @@
 // Permite seguimiento GPS, actualización de estado y comunicación en tiempo real
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
+import { playNotificationSound } from '../utils/notifications';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import Layout from '../components/Layout';
@@ -222,7 +224,27 @@ const DriverOrderDetail = () => {
       }
     } catch (err) {
       console.error('Error al actualizar estado:', err);
-      alert(err.response?.data?.message || 'Error al actualizar el estado');
+      playNotificationSound();
+      toast.error(err.response?.data?.message || 'Error al actualizar el estado');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const cancelOrderByDriver = async () => {
+    try {
+      const confirm = window.confirm('¿Querés rechazar este pedido? El administrador será notificado.');
+      if (!confirm) return;
+      setUpdating(true);
+      const response = await axios.put(`/api/orders/${orderId}/cancel-by-driver`, {});
+      if (response.data.success) {
+        setOrder(prev => (prev ? { ...prev, ...response.data.data } : response.data.data));
+        setTimeout(() => navigate('/driver/orders'), 1500);
+      }
+    } catch (err) {
+      console.error('Error al cancelar pedido por driver:', err);
+      playNotificationSound();
+      toast.error(err.response?.data?.message || 'Error al cancelar el pedido');
     } finally {
       setUpdating(false);
     }
@@ -532,6 +554,17 @@ const DriverOrderDetail = () => {
                       )}
                     </button>
                   ))}
+
+                  {order.status === 'assigned' && (
+                    <button
+                      type="button"
+                      onClick={cancelOrderByDriver}
+                      disabled={updating}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white py-3 px-4 rounded-lg font-medium transition-colors disabled:opacity-50"
+                    >
+                      {updating ? 'Procesando...' : 'Rechazar pedido'}
+                    </button>
+                  )}
 
                   {(order.status === 'picked_up' || order.status === 'on_the_way') && (
                     <div className="bg-blue-50 border border-blue-200 rounded p-3">

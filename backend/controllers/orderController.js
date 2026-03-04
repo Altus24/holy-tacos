@@ -17,6 +17,17 @@ const DRIVER_TRANSITIONS = {
   on_the_way: 'delivered'
 };
 
+const DRIVER_FINAL_STATUSES = [
+  'delivered',
+  'completed',
+  'cancelled',
+  'cancelled_by_client',
+  'cancelled_by_client_with_penalty',
+  'cancelled_by_admin',
+  'cancelled_by_admin_with_penalty',
+  'cancelled_by_driver'
+];
+
 /**
  * Asignar o reasignar conductor a un pedido (solo admin).
  * - Asignación inicial: pending → assigned, sin driver previo.
@@ -389,6 +400,98 @@ const updateStatus = async (req, res) => {
 };
 
 /**
+ * Cancelar/rechazar pedido por parte del driver.
+ * - Solo el driver asignado puede cancelar.
+ * - Solo en estados tempranos: assigned, heading_to_restaurant.
+ * - Marca el pedido como cancelled_by_driver y notifica al cliente.
+ */
+const cancelByDriver = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const io = req.app.get('io');
+
+    const order = await Order.findById(id)
+      .populate('userId', 'email name')
+      .populate('driverId', 'email name');
+
+    if (!order) {
+      return res.status(404).json({ success: false, message: 'Pedido no encontrado' });
+    }
+
+    const driverId = order.driverId?._id?.toString() || order.driverId?.toString();
+    if (req.user.role !== 'driver' || driverId !== req.user._id.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo el conductor asignado puede cancelar este pedido'
+      });
+    }
+
+    if (DRIVER_FINAL_STATUSES.includes(order.status)) {
+      return res.status(400).json({
+        success: false,
+        message: `Este pedido ya está en estado final (${order.status}) y no se puede cancelar.`
+      });
+    }
+
+    const allowedFrom = ['assigned', 'heading_to_restaurant'];
+    if (!allowedFrom.includes(order.status)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Solo podés rechazar pedidos asignados o cuando vas camino al restaurante.'
+      });
+    }
+
+    const reason = (req.body?.reason || '').toString().trim();
+
+    const historyEntry = {
+      status: 'cancelled_by_driver',
+      changedBy: req.user._id,
+      changedAt: new Date(),
+      role: 'driver',
+      notes: reason || undefined
+    };
+
+    const updateData = {
+      status: 'cancelled_by_driver',
+      updatedAt: new Date(),
+      cancelledAt: new Date(),
+      cancelledBy: req.user._id,
+      cancelledByRole: 'driver',
+      cancellationReason: reason
+    };
+
+    const updated = await Order.findByIdAndUpdate(
+      id,
+      { $set: updateData, $push: { statusHistory: historyEntry } },
+      { new: true, runValidators: true }
+    )
+      .populate('userId', 'email name')
+      .populate('restaurantId', 'name address phone')
+      .populate('driverId', 'email name');
+
+    // Notificar al cliente para que actualice su lista sin polling
+    const clientId = updated.userId?._id || updated.userId;
+    socketEvents.emitOrderStatusChangedToClient(io, clientId, {
+      orderId: updated._id,
+      status: 'cancelled_by_driver',
+      message: 'El conductor canceló este pedido.'
+    });
+
+    return res.json({
+      success: true,
+      message: 'Pedido cancelado por el conductor.',
+      data: updated
+    });
+  } catch (error) {
+    console.error('Error al cancelar pedido por driver:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al cancelar el pedido por parte del conductor'
+    });
+  }
+};
+
+/**
  * Cliente confirma la entrega. delivered → completed. Solo el dueño del pedido.
  * Emite 'orderCompleted' a admin y driver.
  */
@@ -676,5 +779,6 @@ module.exports = {
   confirmDelivery,
   rateOrder,
   getDriverOrderCounts,
-  getDriverOrders
+  getDriverOrders,
+  cancelByDriver
 };

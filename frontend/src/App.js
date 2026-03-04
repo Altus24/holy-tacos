@@ -49,11 +49,13 @@ function App() {
   return (
     <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <div className="App">
-        {/* Banners PWA: siempre presentes independientemente de la ruta */}
-        <OfflineBanner />
-        <PwaInstallBanner />
-        <PwaUpdateBanner />
-        <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
+        <Toaster
+          position="top-right"
+          toastOptions={{
+            duration: Infinity,
+            closeButton: true
+          }}
+        />
         <Suspense fallback={<PageFallback />}>
           <Routes>
             {/* Ruta principal: driver → mapa; client/anon → Home */}

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { playNotificationSound } from '../utils/notifications';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import Layout from '../components/Layout';
@@ -79,12 +80,14 @@ const OrderTracking = () => {
       const un2 = onOrderOnTheWay?.((payload) => {
         if (payload?.orderId === orderId || String(payload?.orderId) === orderId) {
           setOrder(prev => prev ? { ...prev, status: 'on_the_way' } : prev);
+          playNotificationSound();
           toast.success(payload?.message || 'El pedido está en camino a tu domicilio');
         }
       });
       const un3 = onOrderDelivered?.((payload) => {
         if (payload?.orderId === orderId || String(payload?.orderId) === orderId) {
           setOrder(prev => prev ? { ...prev, status: 'delivered' } : prev);
+          playNotificationSound();
           toast.success(payload?.message || '¡Tu pedido llegó! Confirma la recepción para completar.', { duration: 6000 });
         }
       });
@@ -98,6 +101,7 @@ const OrderTracking = () => {
         if (!payload?.orderId) return;
         if (payload.orderId === orderId || String(payload.orderId) === String(orderId)) {
           setOrder(prev => prev ? { ...prev, status: 'at_restaurant' } : prev);
+          playNotificationSound();
           toast.success(payload?.message || 'El driver ya está en el restaurante. Podés seguirlo en el mapa.');
           setIsMapModalOpen(true);
           setMapAutoOpened(true);
@@ -224,6 +228,7 @@ const OrderTracking = () => {
   const handleSubmitReport = () => {
     setReportSending(true);
     setTimeout(() => {
+      playNotificationSound();
       toast.success('Gracias. Soporte te contactará.');
       setReportModalOpen(false);
       setReportSending(false);
@@ -237,11 +242,16 @@ const OrderTracking = () => {
       const res = await axios.put(`/api/orders/${orderId}/confirm-delivery`);
       if (res.data.success && res.data.data) {
         setOrder(res.data.data);
+        playNotificationSound();
         toast.success('Recepción confirmada. Ahora califica tu experiencia.');
         navigate(`/rate/${orderId}`, { replace: true });
       }
-      if (res.data.message && !res.data.data) toast.success(res.data.message);
+      if (res.data.message && !res.data.data) {
+        playNotificationSound();
+        toast.success(res.data.message);
+      }
     } catch (err) {
+      playNotificationSound();
       toast.error(err.response?.data?.message || 'Error al confirmar');
     } finally {
       setConfirming(false);

@@ -270,6 +270,9 @@ router.put('/:id/status', authenticateToken, (req, res) => {
   });
 });
 
+// PUT /api/orders/:id/cancel-by-driver - Cancelar/rechazar pedido por parte del conductor
+router.put('/:id/cancel-by-driver', authenticateToken, requireDriver, orderController.cancelByDriver);
+
 // PUT /api/orders/:id/confirm-delivery - Cliente confirma la entrega (delivered → completed). Solo el dueño del pedido.
 router.put('/:id/confirm-delivery', authenticateToken, orderController.confirmDelivery);
 

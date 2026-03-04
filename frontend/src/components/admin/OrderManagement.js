@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import toast from 'react-hot-toast';
+import { playNotificationSound } from '../../utils/notifications';
 import { format } from 'date-fns';
 import { useSocket } from '../../context/SocketContext';
 import CancelOrderAdminModal from './CancelOrderAdminModal';
@@ -63,27 +64,32 @@ const OrderManagement = ({ onStatsUpdate }) => {
   // Notificaciones en tiempo real para admin: refetch y toasts
   useEffect(() => {
     const un1 = onNewOrderCreated?.((p) => {
+      playNotificationSound();
       toast.success(p?.message || 'Nueva orden pendiente de asignación');
       loadData();
       if (onStatsUpdate) onStatsUpdate();
     });
     const un2 = onDriverHeadingToRestaurant?.((p) => {
+      playNotificationSound();
       toast.success(p?.message || 'El driver está en camino al restaurante');
       loadData();
       if (onStatsUpdate) onStatsUpdate();
     });
     const un3 = onOrderStatusUpdateAdmin?.((p) => {
       const shortId = p?.orderId ? String(p.orderId).slice(-6) : '???';
+      playNotificationSound();
       toast.success(`Driver en camino para pedido #${shortId}`);
       loadData();
       if (onStatsUpdate) onStatsUpdate();
     });
     const un4 = onOrderOnTheWay?.((p) => {
+      playNotificationSound();
       toast.success(p?.message || 'El pedido está en camino al domicilio');
       loadData();
       if (onStatsUpdate) onStatsUpdate();
     });
     const un5 = onOrderCompleted?.((p) => {
+      playNotificationSound();
       toast.success(p?.message || 'El cliente confirmó la entrega');
       loadData();
       if (onStatsUpdate) onStatsUpdate();
@@ -108,9 +114,11 @@ const OrderManagement = ({ onStatsUpdate }) => {
       });
       loadData();
       if (onStatsUpdate) onStatsUpdate();
+      playNotificationSound();
       toast.success('Driver asignado correctamente');
     } catch (error) {
       console.error('Error asignando driver:', error);
+      playNotificationSound();
       toast.error('Error al asignar driver: ' + (error.response?.data?.message || 'Error desconocido'));
     } finally {
       setAssigningDriver(null);
@@ -135,6 +143,7 @@ const OrderManagement = ({ onStatsUpdate }) => {
         driverId: reassignDriverId,
         reassign: true
       });
+      playNotificationSound();
       toast.success('Driver reasignado correctamente');
       setReassignModalOpen(false);
       setReassignOrder(null);
@@ -143,6 +152,7 @@ const OrderManagement = ({ onStatsUpdate }) => {
       if (onStatsUpdate) onStatsUpdate();
     } catch (error) {
       console.error('Error reasignando driver:', error);
+      playNotificationSound();
       toast.error(error.response?.data?.message || 'Error al reasignar driver');
     } finally {
       setReassignLoading(false);
@@ -155,9 +165,11 @@ const OrderManagement = ({ onStatsUpdate }) => {
       await axios.put(`/api/admin/orders/${orderId}/ready`);
       loadData();
       if (onStatsUpdate) onStatsUpdate();
+      playNotificationSound();
       toast.success('Pedido marcado como listo para recoger');
     } catch (error) {
       console.error('Error al marcar listo:', error);
+      playNotificationSound();
       toast.error(error.response?.data?.message || 'Error al actualizar');
     } finally {
       setSettingReady(null);

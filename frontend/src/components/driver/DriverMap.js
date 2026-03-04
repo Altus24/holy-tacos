@@ -2,6 +2,7 @@
 // navegación paso a paso con voz, capa de tráfico, alertas de tráfico inteligentes.
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import toast from 'react-hot-toast';
+import { playNotificationSound } from '../../utils/notifications';
 import {
   GoogleMap,
   LoadScript,
@@ -344,7 +345,12 @@ const DriverMap = ({
       // Alerta si el tráfico añade más del 20 % al tiempo normal
       if (first.durationInTraffic > first.duration * 1.2 && first.duration > 0) {
         const extraMin = Math.ceil((first.durationInTraffic - first.duration) / 60);
-        toast(`Tráfico pesado detectado. Ruta alternativa sugerida (+${extraMin} min).`, { icon: '🚗', duration: 5000, style: { borderLeft: '4px solid #dc2626' } });
+        playNotificationSound();
+        toast(`Tráfico pesado detectado. Ruta alternativa sugerida (+${extraMin} min).`, {
+          icon: '🚗',
+          duration: 5000,
+          style: { borderLeft: '4px solid #dc2626' }
+        });
       }
       // Seleccionar la ruta más rápida con tráfico
       let bestIdx = 0;
@@ -353,7 +359,10 @@ const DriverMap = ({
         const d = r.durationInTraffic || r.duration;
         if (d < bestDur) { bestDur = d; bestIdx = i; }
       });
-      if (bestIdx !== 0) toast('Ruta alternativa más rápida seleccionada.', { icon: '✓', duration: 3000 });
+      if (bestIdx !== 0) {
+        playNotificationSound();
+        toast('Ruta alternativa más rápida seleccionada.', { icon: '✓', duration: 3000 });
+      }
       const best = summaries[bestIdx];
       setRouteToRestaurant({
         fullResult: result,
@@ -377,6 +386,7 @@ const DriverMap = ({
       svc.route({ origin, destination, travelMode: 'DRIVING', provideRouteAlternatives: true }, (res2, st2) => {
         if (st2 !== 'OK' || !res2.routes?.length) {
           setRouteToRestaurantLoading(false);
+          playNotificationSound();
           toast.error('No se pudo calcular la ruta.');
           return;
         }
@@ -479,6 +489,7 @@ const DriverMap = ({
     const { lat, lng } = orderRestaurantCoords;
     if (/Android/i.test(navigator.userAgent)) {
       window.location.href = `google.navigation:q=${lat},${lng}`;
+      playNotificationSound();
       toast.success('Abriendo Google Maps');
       return;
     }
@@ -492,6 +503,7 @@ const DriverMap = ({
     svc.route({ origin, destination, travelMode: 'DRIVING' }, (result, status) => {
       setRouteToRestaurantLoading(false);
       if (status !== 'OK' || !result.routes?.length) {
+        playNotificationSound();
         toast.error('No se pudo calcular la ruta para la orden.');
         return;
       }
@@ -515,6 +527,7 @@ const DriverMap = ({
       setNavigationMode(true);
       setCurrentStepIndex(0);
       lastSpokenStepRef.current = -1;
+      playNotificationSound();
       toast.success('Navegación iniciada.');
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -525,6 +538,7 @@ const DriverMap = ({
     setNavigationMode(true);
     setCurrentStepIndex(0);
     lastSpokenStepRef.current = -1;
+    playNotificationSound();
     toast.success('Navegación iniciada. Seguí las instrucciones.');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [routeToRestaurant?.destination, driverLocation]);
@@ -545,7 +559,11 @@ const DriverMap = ({
       drivingOptions: { departureTime: new Date(), trafficModel: window.google.maps.TrafficModel?.PESSIMISTIC ?? 'pessimistic' }
     }, (result, status) => {
       setRouteToRestaurantLoading(false);
-      if (status !== 'OK' || !result.routes?.length) { toast.error('No se pudo recalcular la ruta.'); return; }
+      if (status !== 'OK' || !result.routes?.length) {
+        playNotificationSound();
+        toast.error('No se pudo recalcular la ruta.');
+        return;
+      }
       const summaries = result.routes.map((route, idx) => {
         const leg = route.legs?.[0];
         const dur = leg?.duration?.value ?? 0;
@@ -560,6 +578,7 @@ const DriverMap = ({
       } : null);
       setCurrentStepIndex(0);
       lastSpokenStepRef.current = -1;
+      playNotificationSound();
       toast.success('Ruta recalculada.');
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -574,6 +593,7 @@ const DriverMap = ({
     } else {
       window.open(`https://www.google.com/maps/dir/?api=1&origin=${dlat},${dlng}&destination=${rlat},${rlng}&travelmode=driving`, '_blank', 'noopener,noreferrer');
     }
+    playNotificationSound();
     toast.success('Abriendo Google Maps');
   }, [routeToRestaurant?.destination, driverLocation]);
 
@@ -581,6 +601,7 @@ const DriverMap = ({
     if (!routeToRestaurant?.destination) return;
     const { lat, lng } = routeToRestaurant.destination;
     window.open(`https://waze.com/ul?ll=${lat},${lng}&navigate=yes`, '_blank', 'noopener,noreferrer');
+    playNotificationSound();
     toast.success('Abriendo Waze');
   }, [routeToRestaurant?.destination]);
 

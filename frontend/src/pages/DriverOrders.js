@@ -1,7 +1,8 @@
 // Página de pedidos para conductores en Holy Tacos con tracking en tiempo real
 import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { playNotificationSound } from '../utils/notifications';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import Layout from '../components/Layout';
@@ -20,7 +21,6 @@ const DriverOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingOrder, setUpdatingOrder] = useState(null);
-  const [lastUpdate, setLastUpdate] = useState(null);
   const [activeTab, setActiveTab] = useState('assigned'); // 'assigned' | 'in_progress' | 'completed'
   const [expandedOrderId, setExpandedOrderId] = useState(null); // para dropdown de completados
 
@@ -29,7 +29,6 @@ const DriverOrders = () => {
       const response = await axios.get('/api/orders');
       if (response.data.success) {
         setOrders(response.data.data);
-        setLastUpdate(new Date());
       }
     } catch (error) {
       console.error('Error al cargar pedidos:', error);
@@ -48,6 +47,7 @@ const DriverOrders = () => {
     const un1 = onOrderAssigned?.((payload) => {
       const shortId = payload?.orderId ? String(payload.orderId).slice(-6) : '';
       const message = payload?.message || `Te asignaron un nuevo pedido ${shortId ? `#${shortId}` : ''}`;
+      playNotificationSound();
       toast.custom(
         (t) => (
           <div className="flex items-center gap-3 bg-white shadow-lg rounded-lg px-4 py-3 border border-gray-200">
@@ -55,7 +55,11 @@ const DriverOrders = () => {
             <button
               type="button"
               onClick={() => {
-                navigate('/driver/orders');
+                if (payload?.orderId) {
+                  navigate(`/driver/orders/${payload.orderId}`);
+                } else {
+                  navigate('/driver/orders');
+                }
                 toast.dismiss(t.id);
               }}
               className="bg-orange-600 text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-orange-700 whitespace-nowrap"
@@ -66,9 +70,15 @@ const DriverOrders = () => {
         ),
         { duration: 8000 }
       );
+      if (payload?.orderId) {
+        navigate(`/driver/orders/${payload.orderId}`);
+      } else {
+        navigate('/driver/orders');
+      }
       loadDriverOrders();
     });
     const un2 = onOrderReadyForPickup?.(() => {
+      playNotificationSound();
       toast.success('El pedido ya está listo para que lo recojas en el restaurante');
       loadDriverOrders();
     });
@@ -76,18 +86,19 @@ const DriverOrders = () => {
       if (!payload?.orderId) return;
       // Remover pedido cancelado de la lista local inmediatamente
       setOrders(prev => prev.filter(o => o._id !== payload.orderId && String(o._id) !== String(payload.orderId)));
+      playNotificationSound();
       toast.error(payload.message || 'Un pedido asignado a vos fue cancelado.');
-      setLastUpdate(new Date());
     });
     const un4 = onOrderReassignedAway?.((payload) => {
       if (!payload?.orderId) return;
       // Remover el pedido reasignado a otro driver
       setOrders(prev => prev.filter(o => o._id !== payload.orderId && String(o._id) !== String(payload.orderId)));
+      playNotificationSound();
       toast.error(payload.message || 'Un pedido asignado a vos fue reasignado a otro conductor.');
-      setLastUpdate(new Date());
     });
     const un5 = onOrderReassignedToYou?.((payload) => {
       const shortId = payload?.orderId ? String(payload.orderId).slice(-6) : '';
+      playNotificationSound();
       toast.success(payload?.message || `Te reasignaron un pedido ${shortId ? `(#${shortId})` : ''}.`);
       loadDriverOrders();
     });
@@ -96,8 +107,8 @@ const DriverOrders = () => {
       const orderId = payload?.orderId;
       if (!orderId) return;
       setOrders(prev => prev.map(o => (o._id === orderId || String(o._id) === String(orderId)) ? { ...o, status: 'completed' } : o));
+      playNotificationSound();
       toast.success(payload?.message || 'Entrega completada.');
-      setLastUpdate(new Date());
     });
     return () => { if (un1) un1(); if (un2) un2(); if (un3) un3(); if (un4) un4(); if (un5) un5(); if (un6) un6(); };
   }, [onOrderAssigned, onOrderReadyForPickup, onOrderCancelled, onOrderReassignedAway, onOrderReassignedToYou, onOrderCompleted, loadDriverOrders, navigate]);
@@ -105,16 +116,7 @@ const DriverOrders = () => {
   // Cargar pedidos al montar (ya llamado en useEffect anterior)
   const handleOrderStatusUpdate = useCallback((orderId, newStatus) => {
     setOrders(prev => prev.map(o => (o._id === orderId ? { ...o, status: newStatus } : o)));
-    setLastUpdate(new Date());
   }, []);
-
-
-  // Verificar nuevos pedidos cuando se actualice la lista
-  useEffect(() => {
-    if (orders.length > 0 && lastUpdate) {
-      // Aquí podríamos comparar con el estado anterior para detectar nuevos pedidos
-    }
-  }, [orders, lastUpdate]);
 
   // Actualizar estado del pedido
   const updateOrderStatus = async (orderId, newStatus) => {
@@ -137,7 +139,30 @@ const DriverOrders = () => {
       }
     } catch (error) {
       console.error('Error al actualizar pedido:', error);
+      playNotificationSound();
       toast.error(error.response?.data?.message || 'Error al actualizar el pedido');
+    } finally {
+      setUpdatingOrder(null);
+    }
+  };
+
+  const rejectOrder = async (orderId) => {
+    try {
+      const confirm = window.confirm('¿Querés rechazar este pedido? El administrador será notificado.');
+      if (!confirm) return;
+      setUpdatingOrder(orderId);
+      const response = await axios.put(`/api/orders/${orderId}/cancel-by-driver`, {});
+      if (response.data.success) {
+        setOrders(prev =>
+          prev.filter(o => o._id !== orderId && String(o._id) !== String(orderId))
+        );
+        playNotificationSound();
+        toast.success('Pedido rechazado correctamente.');
+      }
+    } catch (error) {
+      console.error('Error al rechazar pedido:', error);
+      playNotificationSound();
+      toast.error(error.response?.data?.message || 'Error al rechazar el pedido');
     } finally {
       setUpdatingOrder(null);
     }
@@ -263,15 +288,6 @@ const DriverOrders = () => {
               Bienvenido, {user?.email}. Gestiona tus entregas activas.
             </p>
 
-            {/* Hora de la última actualización (solo cuando llegan cambios por tiempo real) */}
-            {lastUpdate && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mt-4">
-                <p className="text-blue-800 text-sm flex items-center">
-                  <span className="mr-2">🔄</span>
-                  Última actualización: {lastUpdate.toLocaleTimeString()}
-                </p>
-              </div>
-            )}
           </div>
 
           {/* Pestañas: Asignados | En proceso | Completados */}
@@ -379,12 +395,9 @@ const DriverOrders = () => {
                               <p className="text-yellow-800 text-sm">{order.notes}</p>
                             </div>
                           )}
-                          <div className="flex justify-between items-center">
-                            <p className="text-sm text-gray-500">Entregado: {order.deliveredAt ? new Date(order.deliveredAt).toLocaleString() : new Date(order.updatedAt).toLocaleString()}</p>
-                            <Link to={`/driver/orders/${order._id}`} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm font-medium">
-                              📍 Ver Detalles
-                            </Link>
-                          </div>
+                          <p className="text-sm text-gray-500">
+                            Entregado: {order.deliveredAt ? new Date(order.deliveredAt).toLocaleString() : new Date(order.updatedAt).toLocaleString()}
+                          </p>
                         </div>
                       )}
                     </div>
@@ -427,7 +440,6 @@ const DriverOrders = () => {
                           <span className="mr-2">🚚</span> Ubicación en tiempo real:
                         </h4>
                         <p className="text-blue-800 font-medium">{getDriverLocation(order)}</p>
-                        <div className="text-xs text-blue-600 mt-2">Última actualización: {lastUpdate ? lastUpdate.toLocaleTimeString() : 'Cargando...'}</div>
                       </div>
                     )}
 
@@ -439,26 +451,45 @@ const DriverOrders = () => {
                     )}
 
                     <div className="flex justify-between items-center">
-                      <div className="text-sm text-gray-500">Actualizado: {new Date(order.updatedAt).toLocaleString()}</div>
-                      <div className="flex space-x-2">
-                        <Link to={`/driver/orders/${order._id}`} className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm font-medium">📍 Ver Detalles</Link>
-                        {getNextActions(order).map((action, index) => (
+                      {order.status === 'assigned' ? (
+                        <div className="flex space-x-2">
                           <button
-                            key={index}
+                            type="button"
                             onClick={() => {
-                              if (order.status === 'assigned' && action.status === 'heading_to_restaurant') {
-                                const ok = window.confirm('¿Querés aceptar este pedido y empezar a ir al restaurante?');
-                                if (!ok) return;
-                              }
-                              updateOrderStatus(order._id, action.status);
+                              const ok = window.confirm('¿Querés aceptar este pedido y empezar a ir al restaurante?');
+                              if (!ok) return;
+                              updateOrderStatus(order._id, 'heading_to_restaurant');
                             }}
                             disabled={updatingOrder === order._id}
-                            className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 text-sm disabled:opacity-50"
+                            className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700 text-sm disabled:opacity-50"
                           >
-                            {updatingOrder === order._id ? 'Actualizando...' : action.label}
+                            {updatingOrder === order._id ? 'Aceptando...' : 'Aceptar pedido'}
                           </button>
-                        ))}
-                      </div>
+                          <button
+                            type="button"
+                            onClick={() => rejectOrder(order._id)}
+                            disabled={updatingOrder === order._id}
+                            className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 text-sm disabled:opacity-50"
+                          >
+                            {updatingOrder === order._id ? 'Procesando...' : 'Rechazar pedido'}
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex space-x-2">
+                          {getNextActions(order).map((action, index) => (
+                            <button
+                              key={index}
+                              onClick={() => {
+                                updateOrderStatus(order._id, action.status);
+                              }}
+                              disabled={updatingOrder === order._id}
+                              className="bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700 text-sm disabled:opacity-50"
+                            >
+                              {updatingOrder === order._id ? 'Actualizando...' : action.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );

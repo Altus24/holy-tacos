@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { playNotificationSound } from '../utils/notifications';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import Layout from '../components/Layout';
@@ -56,6 +57,7 @@ const DriverDashboard = () => {
     const un1 = onOrderAssigned?.((payload) => {
       const shortId = payload?.orderId ? String(payload.orderId).slice(-6) : '';
       const message = payload?.message || `Te asignaron un nuevo pedido ${shortId ? `#${shortId}` : ''}`;
+      playNotificationSound();
       toast.custom(
         (t) => (
           <div className="flex items-center gap-3 bg-white shadow-lg rounded-lg px-4 py-3 border border-gray-200">

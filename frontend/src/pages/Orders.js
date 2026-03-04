@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
+import { playNotificationSound } from '../utils/notifications';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import Layout from '../components/Layout';
@@ -23,7 +24,6 @@ const Orders = () => {
   const [cancelLoading, setCancelLoading] = useState(false);
   const [cancelMessage, setCancelMessage] = useState(null); // { type: 'success' | 'error', text: '' }
   const [expandedCompletedOrderId, setExpandedCompletedOrderId] = useState(null); // dropdown pedidos completados
-  const [openActionsDropdownId, setOpenActionsDropdownId] = useState(null); // dropdown acciones (pago/soporte/cancelar)
   const ordersRef = useRef(orders);
   ordersRef.current = orders;
 
@@ -80,12 +80,12 @@ const Orders = () => {
       cancelled_by_admin: 'Cancelado por admin'
     };
 
-    const message = `¡Pedido #${order._id.slice(-6)} actualizado!\nEstado anterior: ${statusMessages[oldStatus]}\nNuevo estado: ${statusMessages[newStatus]}`;
+    const message = `¡Pedido #${order._id.slice(-6)} actualizado! Estado anterior: ${statusMessages[oldStatus]} → Nuevo estado: ${statusMessages[newStatus]}`;
 
-    // Mostrar notificación con alert (podría mejorarse con un sistema de notificaciones más sofisticado)
-    setTimeout(() => {
-      alert(message);
-    }, 500);
+    playNotificationSound();
+    toast(message, {
+      icon: '📦'
+    });
   };
 
   // Función para simular ubicación del conductor
@@ -238,6 +238,7 @@ const Orders = () => {
   // Sincronizar lista solo cuando hay cambios reales (eventos en tiempo real)
   useEffect(() => {
     const unDelivered = onOrderDelivered?.((payload) => {
+      playNotificationSound();
       toast.success(payload?.message || '¡Tu pedido llegó! Confirma la recepción para completar.', { duration: 6000 });
       fetchOrders();
     });
@@ -548,55 +549,40 @@ const Orders = () => {
                       </div>
 
                       <div className="flex flex-wrap items-center gap-2">
-                        {/* Dropdown: Proceder al pago / Contactar soporte / Cancelar pedido (pedidos pendientes de pago o cancelados) */}
-                        {(order.paymentStatus === 'pending' || isCancellable(order) ||
-                          order.status === 'cancelled' || order.status === 'cancelled_by_client' ||
-                          order.status === 'cancelled_by_client_with_penalty' ||
-                          order.status === 'cancelled_by_admin' || order.status === 'cancelled_by_admin_with_penalty') && (
-                          <div className="relative">
-                            <button
-                              type="button"
-                              onClick={() => setOpenActionsDropdownId(openActionsDropdownId === order._id ? null : order._id)}
-                              className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-200 border border-gray-300 text-sm font-medium"
-                            >
-                              Acciones del pedido
-                              <svg className={`w-4 h-4 transition-transform ${openActionsDropdownId === order._id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                              </svg>
-                            </button>
-                            {openActionsDropdownId === order._id && (
-                              <>
-                                <div className="fixed inset-0 z-10" onClick={() => setOpenActionsDropdownId(null)} aria-hidden="true" />
-                                <div className="absolute right-0 mt-1 w-56 rounded-lg shadow-lg bg-white border border-gray-200 py-1 z-20">
-                                  {order.paymentStatus === 'pending' && (
-                                    <Link
-                                      to={`/checkout?orderId=${order._id}`}
-                                      className="block px-4 py-2 text-sm text-gray-700 hover:bg-orange-50 hover:text-orange-700"
-                                      onClick={() => setOpenActionsDropdownId(null)}
-                                    >
-                                      💳 Proceder al pago
-                                    </Link>
-                                  )}
-                                  <a
-                                    href="mailto:soporte@holytacos.com"
-                                    className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                                    onClick={() => setOpenActionsDropdownId(null)}
-                                  >
-                                    📞 Contactar soporte
-                                  </a>
-                                  {isCancellable(order) && (
-                                    <button
-                                      type="button"
-                                      onClick={() => { setOpenActionsDropdownId(null); handleOpenCancelModal(order); }}
-                                      className="block w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium"
-                                    >
-                                      Cancelar pedido
-                                    </button>
-                                  )}
-                                </div>
-                              </>
-                            )}
-                          </div>
+                        {/* Acciones rápidas: pagar / soporte / cancelar */}
+                        {order.paymentStatus === 'pending' && (
+                          <Link
+                            to={`/checkout?orderId=${order._id}`}
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-emerald-600 text-white hover:bg-emerald-700"
+                            title="Pagar pedido"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M3 11h18M7 15h10M5 19h14" />
+                            </svg>
+                          </Link>
+                        )}
+
+                        <a
+                          href="mailto:soporte@holytacos.com"
+                          className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 border border-gray-300"
+                          title="Contactar soporte"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-1-1.732L12 2 4 5.268A2 2 0 003 7v10a2 2 0 002 2z" />
+                          </svg>
+                        </a>
+
+                        {isCancellable(order) && (
+                          <button
+                            type="button"
+                            onClick={() => handleOpenCancelModal(order)}
+                            className="inline-flex items-center justify-center w-9 h-9 rounded-full bg-red-600 text-white hover:bg-red-700"
+                            title="Cancelar pedido"
+                          >
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                          </button>
                         )}
 
                         {/* Botón para ver tracking en tiempo real */}
