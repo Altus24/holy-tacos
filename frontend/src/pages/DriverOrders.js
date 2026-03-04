@@ -22,8 +22,6 @@ const DriverOrders = () => {
   const [loading, setLoading] = useState(true);
   const [updatingOrder, setUpdatingOrder] = useState(null);
   const [activeTab, setActiveTab] = useState('assigned'); // 'assigned' | 'in_progress' | 'completed'
-  const [expandedOrderId, setExpandedOrderId] = useState(null); // para dropdown de completados
-  const [lastUpdate, setLastUpdate] = useState(null); // ← agrega esta línea
 
   const loadDriverOrders = useCallback(async () => {
     try {
@@ -338,74 +336,6 @@ const DriverOrders = () => {
               </div>
             ) : (
               listToShow.map(order => {
-                const isCompleted = order.status === 'completed';
-                const isExpanded = expandedOrderId === order._id;
-
-                // Órdenes completadas: dropdown cerrado por defecto (nombre cliente + barrio/dirección)
-                if (isCompleted) {
-                  return (
-                    <div key={order._id} className="bg-white rounded-lg shadow overflow-hidden border border-gray-200">
-                      <button
-                        type="button"
-                        onClick={() => setExpandedOrderId(isExpanded ? null : order._id)}
-                        className="w-full px-6 py-4 flex justify-between items-center text-left hover:bg-gray-50 transition-colors"
-                      >
-                        <div>
-                          <p className="font-semibold text-gray-900">
-                            {order.userId?.name || order.userId?.email || 'Cliente'}
-                          </p>
-                          <p className="text-sm text-gray-600 mt-0.5">
-                            Barrio / zona: {order.deliveryAddress || '—'}
-                          </p>
-                        </div>
-                        <span className="text-gray-400 flex-shrink-0 ml-2">
-                          <svg className={`w-5 h-5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </span>
-                      </button>
-                      {isExpanded && (
-                        <div className="px-6 pb-6 pt-0 border-t border-gray-100">
-                          <div className="flex justify-between items-start mb-4">
-                            <div>
-                              <h3 className="text-lg font-semibold">Pedido #{order._id.slice(-6)}</h3>
-                              <p className="text-gray-600">Restaurante: {order.restaurantId?.name || 'N/A'}</p>
-                              <p className="text-gray-600">Dirección: {order.deliveryAddress}</p>
-                            </div>
-                            <div className="text-right">
-                              <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(order.status)}`}>
-                                {getStatusText(order.status)}
-                              </span>
-                              <p className="text-sm text-gray-500 mt-2">${order.total} total</p>
-                            </div>
-                          </div>
-                          <div className="mb-4">
-                            <h4 className="font-medium mb-2">Items del pedido:</h4>
-                            <div className="space-y-1">
-                              {order.items?.map((item, index) => (
-                                <div key={index} className="flex justify-between text-sm text-gray-600">
-                                  <span>{item.quantity}x {item.name}</span>
-                                  <span>${item.subtotal}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-                          {order.notes && (
-                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
-                              <h4 className="font-medium text-yellow-900 mb-1">📝 Notas del cliente:</h4>
-                              <p className="text-yellow-800 text-sm">{order.notes}</p>
-                            </div>
-                          )}
-                          <p className="text-sm text-gray-500">
-                            Entregado: {order.deliveredAt ? new Date(order.deliveredAt).toLocaleString() : new Date(order.updatedAt).toLocaleString()}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-
-                // Órdenes asignadas: tarjeta completa como antes
                 return (
                   <div key={order._id} className="bg-white rounded-lg shadow p-6">
                     <div className="flex justify-between items-start mb-4">
