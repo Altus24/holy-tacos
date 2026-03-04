@@ -1,15 +1,56 @@
 {
+  "name": "Holy Tacos - Delivery",
   "short_name": "Holy Tacos",
-  "name": "Holy Tacos - Delivery App",
+  "description": "Pedí comida a domicilio o administrá tus entregas como conductor.",
+  "start_url": "/?utm_source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait",
+  "theme_color": "#ea580c",
+  "background_color": "#000000",
+  "lang": "es-AR",
+  "categories": ["food", "delivery"],
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.ico",
       "sizes": "64x64 32x32 24x24 16x16",
       "type": "image/x-icon"
     }
   ],
-  "start_url": ".",
-  "display": "standalone",
-  "theme_color": "#f97316",
-  "background_color": "#ffffff"
+  "shortcuts": [
+    {
+      "name": "Restaurantes",
+      "short_name": "Restaurantes",
+      "description": "Ver restaurantes disponibles",
+      "url": "/restaurants",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Mi Mapa",
+      "short_name": "Mi Mapa",
+      "description": "Mapa del conductor en tiempo real",
+      "url": "/driver/map",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Mis Pedidos",
+      "short_name": "Pedidos",
+      "description": "Ver el estado de tus pedidos",
+      "url": "/orders",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
 }

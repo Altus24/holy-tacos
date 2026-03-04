@@ -2,19 +2,57 @@
 <html lang="es">
   <head>
     <meta charset="utf-8" />
+
+    <!-- Viewport: viewport-fit=cover cubre el notch de iPhone y la barra de gestos de Android -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+
+    <!-- PWA: tema y color de barra de estado -->
+    <meta name="theme-color" content="#ea580c" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#ea580c" media="(prefers-color-scheme: dark)" />
+
+    <!-- PWA general -->
+    <meta name="application-name" content="Holy Tacos" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- PWA iOS (Safari) -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <!-- black-translucent: el contenido va debajo de la barra de estado (usa padding-top: env(safe-area-inset-top)) -->
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="Holy Tacos" />
+
+    <!-- Íconos -->
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#ea580c" />
-    <meta
-      name="description"
-      content="Holy Tacos - Tu plataforma de delivery de comida favorita"
-    />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
+    <link rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/icon.svg" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/icon.svg" />
+
+    <!-- Manifest PWA -->
     <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
+
+    <!-- SEO -->
+    <meta name="description" content="Holy Tacos - Tu plataforma de delivery de comida favorita. Pedí, seguí tu entrega en tiempo real." />
+    <meta property="og:title" content="Holy Tacos - Delivery de Comida" />
+    <meta property="og:description" content="Pedí comida a domicilio con seguimiento en tiempo real." />
+    <meta property="og:type" content="website" />
+
     <title>Holy Tacos - Delivery de Comida</title>
+
+    <!-- Splash screen iOS: fondo negro mientras carga para que no haya destello blanco -->
+    <style>
+      html, body, #root {
+        height: 100%;
+        background-color: #000;
+      }
+      /* Safe area insets para pantallas con notch / Dynamic Island */
+      :root {
+        --sat: env(safe-area-inset-top);
+        --sar: env(safe-area-inset-right);
+        --sab: env(safe-area-inset-bottom);
+        --sal: env(safe-area-inset-left);
+      }
+    </style>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <noscript>Necesitás habilitar JavaScript para usar esta aplicación.</noscript>
     <div id="root"></div>
   </body>
 </html>

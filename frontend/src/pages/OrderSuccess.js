@@ -2,16 +2,19 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useCart } from '../context/CartContext';
 import Layout from '../components/Layout';
 import BackButton from '../components/BackButton';
 import axios from 'axios';
 
 const OrderSuccess = () => {
   const { user } = useAuth();
+  const { clearCart } = useCart();
   const [searchParams] = useSearchParams();
   const [orderDetails, setOrderDetails] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [cartCleared, setCartCleared] = useState(false);
 
   const sessionId = searchParams.get('session_id');
 
@@ -77,6 +80,14 @@ const OrderSuccess = () => {
       testPaymentSuccess();
     }
   }, [sessionId, verifyPayment, testPaymentSuccess]);
+
+  // Vaciar carrito una vez que tenemos una orden pagada
+  useEffect(() => {
+    if (!cartCleared && orderDetails && orderDetails.paymentStatus === 'paid') {
+      clearCart();
+      setCartCleared(true);
+    }
+  }, [cartCleared, orderDetails, clearCart]);
 
   if (loading) {
     return (

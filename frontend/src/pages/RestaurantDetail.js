@@ -7,6 +7,7 @@ import Layout from '../components/Layout';
 import BackButton from '../components/BackButton';
 import { useCart } from '../context/CartContext';
 import { useAuth } from '../context/AuthContext';
+import { playNotificationSound } from '../utils/notifications';
 
 const RestaurantDetail = () => {
   const { id } = useParams();
@@ -63,6 +64,7 @@ const RestaurantDetail = () => {
       addToCart(restaurant._id, restaurant.name, item, quantity);
 
       // Mostrar toast informativo con acción rápida
+      playNotificationSound();
       toast((t) => (
         <div className="flex items-start gap-3">
           <div>
@@ -99,6 +101,7 @@ const RestaurantDetail = () => {
         [item.name]: 0
       }));
     } else {
+      playNotificationSound();
       toast.error('Seleccioná una cantidad primero');
     }
   };
