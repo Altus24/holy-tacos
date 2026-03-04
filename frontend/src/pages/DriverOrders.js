@@ -21,6 +21,7 @@ const DriverOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [updatingOrder, setUpdatingOrder] = useState(null);
+  const [, setLastUpdate] = useState(null);
   const [activeTab, setActiveTab] = useState('assigned'); // 'assigned' | 'in_progress' | 'completed'
 
   const loadDriverOrders = useCallback(async () => {
