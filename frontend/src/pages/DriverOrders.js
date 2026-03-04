@@ -23,6 +23,7 @@ const DriverOrders = () => {
   const [updatingOrder, setUpdatingOrder] = useState(null);
   const [activeTab, setActiveTab] = useState('assigned'); // 'assigned' | 'in_progress' | 'completed'
   const [expandedOrderId, setExpandedOrderId] = useState(null); // para dropdown de completados
+  const [lastUpdate, setLastUpdate] = useState(null); // ← agrega esta línea
 
   const loadDriverOrders = useCallback(async () => {
     try {
